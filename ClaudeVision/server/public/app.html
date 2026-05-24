@@ -82,6 +82,25 @@
     }
     #vision-toggle { width: 16px; height: 16px; accent-color: #6FE3A8; cursor: pointer; }
     #vision-toggle-row label { cursor: pointer; }
+    #voice-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 13px;
+      color: #7B7468;
+    }
+    #voice-select {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 13px;
+      color: #4A4540;
+      background: #FFFDF8;
+      border: 1px solid #D9D1C0;
+      border-radius: 8px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
     #vision-status {
       font-family: ui-monospace, monospace;
       font-size: 12px;
@@ -262,6 +281,27 @@
     <input type="checkbox" id="vision-toggle" checked />
     <label for="vision-toggle">Send camera frames to Claude</label>
   </div>
+  <div id="voice-row">
+    <label for="voice-select">Voice</label>
+    <select id="voice-select">
+      <optgroup label="Female">
+        <option value="aura-asteria-en">Asteria · US</option>
+        <option value="aura-luna-en">Luna · US</option>
+        <option value="aura-stella-en">Stella · US</option>
+        <option value="aura-athena-en">Athena · UK</option>
+        <option value="aura-hera-en">Hera · US</option>
+      </optgroup>
+      <optgroup label="Male">
+        <option value="aura-orion-en">Orion · US</option>
+        <option value="aura-arcas-en">Arcas · US</option>
+        <option value="aura-perseus-en">Perseus · US</option>
+        <option value="aura-angus-en">Angus · IE</option>
+        <option value="aura-orpheus-en">Orpheus · US</option>
+        <option value="aura-helios-en">Helios · UK</option>
+        <option value="aura-zeus-en">Zeus · US</option>
+      </optgroup>
+    </select>
+  </div>
   <canvas id="snap" hidden></canvas>
   <div id="vision-status"></div>
   <div id="status">Ready</div>
@@ -289,6 +329,18 @@
     const VISION_KEY = 'aside_vision_enabled';
     visionToggle.checked = localStorage.getItem(VISION_KEY) !== '0';
     function visionEnabled() { return visionToggle.checked; }
+
+    const voiceSelect = document.getElementById('voice-select');
+    const VOICE_KEY = 'aside_voice';
+    const DEFAULT_VOICE = 'aura-asteria-en';
+    const savedVoice = localStorage.getItem(VOICE_KEY);
+    if (savedVoice && [...voiceSelect.options].some(o => o.value === savedVoice)) {
+      voiceSelect.value = savedVoice;
+    }
+    voiceSelect.addEventListener('change', () => {
+      localStorage.setItem(VOICE_KEY, voiceSelect.value);
+    });
+    function selectedVoice() { return voiceSelect.value || DEFAULT_VOICE; }
 
     function setVisionStatus(text, kind /* 'ok' | 'err' | '' */) {
       visionStatus.textContent = text;
@@ -523,7 +575,7 @@
         const res = await fetch('/voice/speak', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, voice: selectedVoice() }),
         });
         if (res.ok) {
           const blob = await res.blob();

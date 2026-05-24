@@ -1,11 +1,18 @@
 import express, { Router } from "express";
 
+const ALLOWED_VOICES = new Set([
+  "aura-asteria-en", "aura-luna-en", "aura-stella-en", "aura-athena-en", "aura-hera-en",
+  "aura-orion-en", "aura-arcas-en", "aura-perseus-en", "aura-angus-en",
+  "aura-orpheus-en", "aura-helios-en", "aura-zeus-en",
+]);
+const DEFAULT_VOICE = "aura-asteria-en";
+
 export function createVoiceRouter() {
   const router = Router();
 
   // POST /voice/speak — Deepgram Aura TTS
   router.post("/speak", async (req, res) => {
-    const { text } = req.body as { text?: string };
+    const { text, voice } = req.body as { text?: string; voice?: string };
     const deepgramKey = process.env.DEEPGRAM_API_KEY;
 
     if (!deepgramKey) {
@@ -17,9 +24,12 @@ export function createVoiceRouter() {
       return;
     }
 
+    // Allowlist the voice to keep the URL parameter trustworthy.
+    const model = voice && ALLOWED_VOICES.has(voice) ? voice : DEFAULT_VOICE;
+
     try {
       const response = await fetch(
-        "https://api.deepgram.com/v1/speak?model=aura-asteria-en",
+        `https://api.deepgram.com/v1/speak?model=${model}`,
         {
           method: "POST",
           headers: {
