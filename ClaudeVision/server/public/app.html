@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Aside — Voice</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&display=swap" />
@@ -116,7 +116,7 @@
     }
     #logout, #diag-open {
       position: fixed;
-      top: 20px;
+      top: calc(20px + env(safe-area-inset-top));
       background: transparent;
       border: 1px solid #D9D1C0;
       color: #7B7468;
