@@ -26,8 +26,7 @@ export function getDb(): Database.Database {
 }
 
 function runMigrations(db: Database.Database): void {
-  // Tables are created idempotently. If we ever need real migrations later
-  // add a `_meta` table with a schema_version row and apply diffs.
+  // Initial schema — idempotent.
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -48,6 +47,24 @@ function runMigrations(db: Database.Database): void {
       used_at INTEGER
     );
   `);
+
+  // Incremental columns — SQLite has no IF NOT EXISTS for ADD COLUMN, so
+  // we check first via PRAGMA and only add when missing. Add new
+  // additive migrations here when expanding the schema.
+  addColumnIfMissing(db, "users", "api_key_openai_enc", "TEXT");
+}
+
+function addColumnIfMissing(
+  db: Database.Database,
+  table: string,
+  column: string,
+  type: string
+): void {
+  const cols = db
+    .prepare(`PRAGMA table_info(${table})`)
+    .all() as Array<{ name: string }>;
+  if (cols.some((c) => c.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
 }
 
 export function closeDb(): void {

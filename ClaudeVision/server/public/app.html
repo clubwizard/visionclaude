@@ -331,21 +331,43 @@
   <div id="voice-row">
     <label for="voice-select">Voice</label>
     <select id="voice-select">
-      <optgroup label="Female">
-        <option value="aura-asteria-en">Asteria · US</option>
-        <option value="aura-luna-en">Luna · US</option>
-        <option value="aura-stella-en">Stella · US</option>
-        <option value="aura-athena-en">Athena · UK</option>
-        <option value="aura-hera-en">Hera · US</option>
+      <optgroup label="Deepgram Aura-2 (warmer)">
+        <option value="aura-2-thalia-en">Thalia · F · US</option>
+        <option value="aura-2-andromeda-en">Andromeda · F · US</option>
+        <option value="aura-2-helena-en">Helena · F · US</option>
+        <option value="aura-2-luna-en">Luna · F · US</option>
+        <option value="aura-2-amalthea-en">Amalthea · F · US</option>
+        <option value="aura-2-apollo-en">Apollo · M · US</option>
+        <option value="aura-2-arcas-en">Arcas · M · US</option>
+        <option value="aura-2-atlas-en">Atlas · M · US</option>
+        <option value="aura-2-orion-en">Orion · M · US</option>
+        <option value="aura-2-aries-en">Aries · M · US</option>
       </optgroup>
-      <optgroup label="Male">
-        <option value="aura-orion-en">Orion · US</option>
-        <option value="aura-arcas-en">Arcas · US</option>
-        <option value="aura-perseus-en">Perseus · US</option>
-        <option value="aura-angus-en">Angus · IE</option>
-        <option value="aura-orpheus-en">Orpheus · US</option>
-        <option value="aura-helios-en">Helios · UK</option>
-        <option value="aura-zeus-en">Zeus · US</option>
+      <optgroup label="OpenAI (most expressive)">
+        <option value="openai-alloy">Alloy · neutral</option>
+        <option value="openai-ash">Ash · warm</option>
+        <option value="openai-ballad">Ballad · lyrical</option>
+        <option value="openai-coral">Coral · warm F</option>
+        <option value="openai-echo">Echo · warm M</option>
+        <option value="openai-fable">Fable · British</option>
+        <option value="openai-nova">Nova · energetic F</option>
+        <option value="openai-onyx">Onyx · deep M</option>
+        <option value="openai-sage">Sage · calm</option>
+        <option value="openai-shimmer">Shimmer · warm F</option>
+      </optgroup>
+      <optgroup label="Deepgram Aura-1 (lower latency, flatter)">
+        <option value="aura-asteria-en">Asteria · F · US</option>
+        <option value="aura-luna-en">Luna · F · US</option>
+        <option value="aura-stella-en">Stella · F · US</option>
+        <option value="aura-athena-en">Athena · F · UK</option>
+        <option value="aura-hera-en">Hera · F · US</option>
+        <option value="aura-orion-en">Orion · M · US</option>
+        <option value="aura-arcas-en">Arcas · M · US</option>
+        <option value="aura-perseus-en">Perseus · M · US</option>
+        <option value="aura-angus-en">Angus · M · IE</option>
+        <option value="aura-orpheus-en">Orpheus · M · US</option>
+        <option value="aura-helios-en">Helios · M · UK</option>
+        <option value="aura-zeus-en">Zeus · M · US</option>
       </optgroup>
     </select>
   </div>
@@ -378,7 +400,7 @@
 
     const voiceSelect = document.getElementById('voice-select');
     const VOICE_KEY = 'aside_voice';
-    const DEFAULT_VOICE = 'aura-asteria-en';
+    const DEFAULT_VOICE = 'aura-2-thalia-en';
     const savedVoice = localStorage.getItem(VOICE_KEY);
     if (savedVoice && [...voiceSelect.options].some(o => o.value === savedVoice)) {
       voiceSelect.value = savedVoice;

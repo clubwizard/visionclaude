@@ -58,6 +58,7 @@ export function createAuthRouter(): Router {
     const status = getUserKeyStatus(user.id);
     const envAnthropic = !!process.env.ANTHROPIC_API_KEY?.trim();
     const envDeepgram = !!process.env.DEEPGRAM_API_KEY?.trim();
+    const envOpenai = !!process.env.OPENAI_API_KEY?.trim();
     const effective = {
       anthropic:
         status.anthropic === "set"
@@ -69,6 +70,12 @@ export function createAuthRouter(): Router {
         status.deepgram === "set"
           ? "own"
           : user.isAdmin && envDeepgram
+          ? "env"
+          : "none",
+      openai:
+        status.openai === "set"
+          ? "own"
+          : user.isAdmin && envOpenai
           ? "env"
           : "none",
     } as const;

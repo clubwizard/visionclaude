@@ -45,14 +45,14 @@ export function createMeRouter(): Router {
 
   // POST /me/api-keys/test — verify a key actually works against the
   // upstream provider without burning real model usage. Body:
-  //   { slot: "anthropic" | "deepgram", candidate?: string }
+  //   { slot: "anthropic" | "deepgram" | "openai", candidate?: string }
   // If `candidate` is supplied it's tested as-is (not saved). Otherwise
   // the stored key for that slot is tested.
   router.post("/api-keys/test", async (req, res) => {
     const body = req.body as { slot?: KeySlot; candidate?: string };
     const slot = body.slot;
-    if (slot !== "anthropic" && slot !== "deepgram") {
-      res.status(400).json({ error: "slot must be 'anthropic' or 'deepgram'" });
+    if (slot !== "anthropic" && slot !== "deepgram" && slot !== "openai") {
+      res.status(400).json({ error: "slot must be 'anthropic', 'deepgram', or 'openai'" });
       return;
     }
     const userId = req.session.userId!;
@@ -65,9 +65,12 @@ export function createMeRouter(): Router {
       return;
     }
     try {
-      const result = slot === "anthropic"
-        ? await testAnthropic(key)
-        : await testDeepgram(key);
+      const result =
+        slot === "anthropic"
+          ? await testAnthropic(key)
+          : slot === "deepgram"
+          ? await testDeepgram(key)
+          : await testOpenAi(key);
       res.json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
@@ -135,6 +138,33 @@ async function testDeepgram(
   }
   if (r.status === 401 || r.status === 403) {
     return { ok: false, reason: "auth", message: `Deepgram rejected the key (${r.status}).` };
+  }
+  return { ok: false, reason: "http", message: `HTTP ${r.status}` };
+}
+
+// OpenAI exposes /v1/models on every key — authenticated GET, no model
+// usage, returns 200 with the model list on success.
+async function testOpenAi(
+  apiKey: string
+): Promise<{ ok: boolean; reason?: string; message?: string }> {
+  const r = await fetch("https://api.openai.com/v1/models", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (r.ok) {
+    const data = (await r.json().catch(() => ({}))) as {
+      data?: Array<{ id: string }>;
+    };
+    return {
+      ok: true,
+      message: `Authenticated. ${data?.data?.length ?? 0} models available.`,
+    };
+  }
+  if (r.status === 401) {
+    return { ok: false, reason: "auth", message: "OpenAI rejected the key (401)." };
+  }
+  if (r.status === 429) {
+    return { ok: false, reason: "rate_limited", message: "Rate-limited (429). Key looks valid." };
   }
   return { ok: false, reason: "http", message: `HTTP ${r.status}` };
 }

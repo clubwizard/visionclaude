@@ -143,11 +143,12 @@ export function authenticate(
 
 // ── API key storage (encrypted at rest) ──
 
-export type KeySlot = "anthropic" | "deepgram";
+export type KeySlot = "anthropic" | "deepgram" | "openai";
 
-const slotColumn: Record<KeySlot, "api_key_anthropic_enc" | "api_key_deepgram_enc"> = {
+const slotColumn: Record<KeySlot, string> = {
   anthropic: "api_key_anthropic_enc",
   deepgram: "api_key_deepgram_enc",
+  openai: "api_key_openai_enc",
 };
 
 export function setUserApiKey(
@@ -172,18 +173,26 @@ export function getUserApiKey(userId: string, slot: KeySlot): string | null {
 }
 
 // Returns "set" / "unset" for each slot — never returns plaintext.
+export type KeyStatus = "set" | "unset";
 export function getUserKeyStatus(
   userId: string
-): { anthropic: "set" | "unset"; deepgram: "set" | "unset" } {
+): Record<KeySlot, KeyStatus> {
   const db = getDb();
   const row = db
     .prepare(
-      "SELECT api_key_anthropic_enc, api_key_deepgram_enc FROM users WHERE id = ?"
+      "SELECT api_key_anthropic_enc, api_key_deepgram_enc, api_key_openai_enc FROM users WHERE id = ?"
     )
-    .get(userId) as { api_key_anthropic_enc: string | null; api_key_deepgram_enc: string | null } | undefined;
+    .get(userId) as
+    | {
+        api_key_anthropic_enc: string | null;
+        api_key_deepgram_enc: string | null;
+        api_key_openai_enc: string | null;
+      }
+    | undefined;
   return {
     anthropic: row?.api_key_anthropic_enc ? "set" : "unset",
     deepgram: row?.api_key_deepgram_enc ? "set" : "unset",
+    openai: row?.api_key_openai_enc ? "set" : "unset",
   };
 }
 

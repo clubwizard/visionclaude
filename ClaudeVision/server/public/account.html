@@ -127,6 +127,18 @@
         </div>
         <div id="deepgram-result" class="test-result"></div>
       </div>
+
+      <div class="key-block">
+        <div class="key-head"><span class="name">OpenAI <span style="font-size:11px;color:#7B7468;font-weight:normal">(for expressive TTS — optional)</span></span> <span id="openai-pill" class="pill unset">unset</span></div>
+        <label for="openai-input">API key</label>
+        <div class="row">
+          <input id="openai-input" type="password" placeholder="sk-…" autocomplete="off" />
+          <button class="test" id="openai-test">Test</button>
+          <button class="primary" id="openai-save">Save</button>
+          <button class="danger" id="openai-clear">Clear</button>
+        </div>
+        <div id="openai-result" class="test-result"></div>
+      </div>
     </div>
 
     <div class="card" id="admin-invites-card" hidden>
@@ -168,6 +180,7 @@
       $('me').innerHTML = `${data.user.email}${data.user.isAdmin ? ' <span style="color:#6FE3A8">· admin</span>' : ''}`;
       applyKeyState('anthropic', data.keys?.anthropic, data.effectiveKeys?.anthropic);
       applyKeyState('deepgram', data.keys?.deepgram, data.effectiveKeys?.deepgram);
+      applyKeyState('openai', data.keys?.openai, data.effectiveKeys?.openai);
       maybeShowSetup(data);
       if (data.user.isAdmin) {
         $('admin-invites-card').hidden = false;
@@ -345,6 +358,9 @@
     $('deepgram-save').onclick = () => saveKey('deepgram');
     $('deepgram-clear').onclick = () => clearKey('deepgram');
     $('deepgram-test').onclick = () => testKey('deepgram');
+    $('openai-save').onclick = () => saveKey('openai');
+    $('openai-clear').onclick = () => clearKey('openai');
+    $('openai-test').onclick = () => testKey('openai');
     $('new-invite').onclick = async () => {
       const res = await fetch('/admin/invites', { method: 'POST' });
       const data = await res.json();
