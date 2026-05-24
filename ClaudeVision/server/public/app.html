@@ -365,15 +365,17 @@
     function explainCameraError(err) {
       const name = err?.name || '';
       const msg = err?.message || '';
+      // All camera failures append "— voice still works" because the rest of
+      // the page (mic + Claude + TTS) is independent of the camera path.
+      const tail = ' — voice still works';
       if (name === 'NotAllowedError') {
-        // Could be a user denial OR a Permissions-Policy header (Plesk default)
-        if (/permission|policy/i.test(msg)) return 'Camera blocked by site policy (Permissions-Policy header)';
-        return 'Camera permission denied — allow it in browser site settings';
+        if (/permission|policy/i.test(msg)) return 'Camera blocked by browser policy' + tail;
+        return 'Camera permission denied — allow it in site settings' + tail;
       }
-      if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No camera found on this device';
-      if (name === 'NotReadableError') return 'Camera is in use by another app';
-      if (name === 'SecurityError') return 'Browser blocked the camera (insecure context?)';
-      return `Camera error: ${name || msg || 'unknown'}`;
+      if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No camera found on this device' + tail;
+      if (name === 'NotReadableError') return 'Camera is in use by another app' + tail;
+      if (name === 'SecurityError') return 'Browser blocked the camera (insecure context?)' + tail;
+      return `Camera error: ${name || msg || 'unknown'}${tail}`;
     }
 
     // Pre-flight: surface obvious blockers before the user taps Talk
@@ -663,7 +665,17 @@
       };
 
       recognition.onerror = (e) => {
-        status.textContent = `Error: ${e.error}`;
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          status.textContent = 'Microphone blocked — allow it in browser site settings';
+        } else if (e.error === 'no-speech') {
+          status.textContent = "Didn't catch that — tap Talk and try again";
+        } else if (e.error === 'audio-capture') {
+          status.textContent = 'No microphone available';
+        } else if (e.error === 'network') {
+          status.textContent = 'Network error during recognition — try again';
+        } else {
+          status.textContent = `Voice error: ${e.error}`;
+        }
         isListening = false;
         talkBtn.textContent = 'Talk';
         talkBtn.classList.remove('listening');
@@ -675,7 +687,17 @@
         talkBtn.classList.remove('listening');
       };
 
-      recognition.start();
+      try {
+        recognition.start();
+      } catch (e) {
+        // Some browsers (notably Firefox iOS) expose webkitSpeechRecognition
+        // but throw synchronously when start() is called. Surface that
+        // instead of leaving the page silent.
+        status.textContent = `Couldn't start voice: ${e?.message || e?.name || 'unknown'} — try Safari`;
+        isListening = false;
+        talkBtn.textContent = 'Talk';
+        talkBtn.classList.remove('listening');
+      }
     }
 
     talkBtn.onclick = async () => {
