@@ -4,6 +4,14 @@ import type { ConversationStore } from "../conversation.js";
 import type { RequestQueue } from "../middleware.js";
 import type { ChatRequest, ChatResponse } from "../types.js";
 
+// Max image content blocks the API call can carry across the full message
+// array (history + the new user turn). Override via MAX_VISION_CONTEXT_IMAGES.
+// 2 = current frame + one prior; older frames become text placeholders.
+const MAX_VISION_CONTEXT_IMAGES = Math.max(
+  1,
+  parseInt(process.env.MAX_VISION_CONTEXT_IMAGES || "2", 10)
+);
+
 export function createChatRouter(
   claudeClient: ClaudeClient,
   conversations: ConversationStore,
@@ -21,6 +29,16 @@ export function createChatRouter(
       }
 
       const { id, messages } = conversations.getOrCreate(body.conversation_id);
+
+      // Prune stored history so older images become text placeholders. The
+      // new turn's images (body.images) are added by ClaudeClient on top, so
+      // we reserve room for them by subtracting from the cap.
+      const incomingImageCount = body.images?.length ?? 0;
+      const historyImageBudget = Math.max(
+        0,
+        MAX_VISION_CONTEXT_IMAGES - incomingImageCount
+      );
+      conversations.pruneImageHistory(id, historyImageBudget);
 
       // Queue the API call to prevent concurrent races
       const chatFn = () =>
