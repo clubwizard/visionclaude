@@ -180,7 +180,7 @@ struct SettingsView: View {
                 .textCase(nil)
                 .font(.subheadline.weight(.semibold))
         } footer: {
-            Text("Enter the address of your VisionClaude gateway server. The channel token enables direct Claude Code integration.")
+            Text("Enter the address of your Aside gateway server. The channel token enables direct Claude Code integration.")
         }
     }
 
@@ -482,7 +482,7 @@ struct SettingsView: View {
                 .textCase(nil)
                 .font(.subheadline.weight(.semibold))
         } footer: {
-            Text("Controls how long VisionClaude waits after you stop speaking before sending your message. Lower values feel snappier.")
+            Text("Controls how long Aside waits after you stop speaking before sending your message. Lower values feel snappier.")
         }
     }
 
@@ -826,12 +826,12 @@ struct RayBanInstructionsView: View {
 
                     Divider()
 
-                    sectionHeader("Step 3: Connect in VisionClaude", icon: "eyeglasses")
-                    stepView(8, "Return to VisionClaude")
+                    sectionHeader("Step 3: Connect in Aside", icon: "eyeglasses")
+                    stepView(8, "Return to Aside")
                     stepView(9, "Go to Settings → Camera Source → select Meta Ray-Ban")
-                    stepView(10, "Tap \"Connect\" — VisionClaude will register with Meta AI")
+                    stepView(10, "Tap \"Connect\" — Aside will register with Meta AI")
                     stepView(11, "You may be redirected to the Meta AI app to approve the connection — tap Allow")
-                    stepView(12, "Once connected, the camera feed from your glasses will appear in VisionClaude")
+                    stepView(12, "Once connected, the camera feed from your glasses will appear in Aside")
 
                     Divider()
 
@@ -839,7 +839,7 @@ struct RayBanInstructionsView: View {
                     bulletPoint("No device found: Make sure glasses are powered on with hinges open")
                     bulletPoint("Stream won't start: Check Developer Mode is ON in Meta AI app")
                     bulletPoint("Glasses need update: Open Meta AI app and follow update prompts")
-                    bulletPoint("Connection lost: Close and reopen VisionClaude, or restart glasses")
+                    bulletPoint("Connection lost: Close and reopen Aside, or restart glasses")
                     linkButton("DAT Developer Docs", url: "https://wearables.developer.meta.com/docs/develop/")
                     linkButton("Community Forum", url: "https://github.com/facebook/meta-wearables-dat-ios/discussions")
 

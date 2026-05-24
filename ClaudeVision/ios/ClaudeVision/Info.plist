@@ -7,7 +7,7 @@
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundleDisplayName</key>
-	<string>VisionClaude</string>
+	<string>Aside</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>CFBundleShortVersionString</key>
@@ -21,19 +21,19 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>NSCameraUsageDescription</key>
-	<string>VisionClaude needs camera access to capture frames for Claude's visual analysis.</string>
+	<string>Aside needs camera access to capture frames for Claude's visual analysis.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>VisionClaude needs microphone access for voice conversations with Claude.</string>
+	<string>Aside needs microphone access for voice conversations with Claude.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>VisionClaude uses speech recognition to transcribe your voice for Claude.</string>
+	<string>Aside uses speech recognition to transcribe your voice for Claude.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>VisionClaude connects to the Claude Gateway server on your local network.</string>
+	<string>Aside connects to the Claude Gateway server on your local network.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_http._tcp</string>
 	</array>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>VisionClaude uses Bluetooth to connect to Meta Ray-Ban Smart Glasses.</string>
+	<string>Aside uses Bluetooth to connect to Meta Ray-Ban Smart Glasses.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -68,12 +68,14 @@
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>VisionClaude uses Bluetooth to receive audio from Meta Ray-Ban Smart Glasses.</string>
+	<string>Aside uses Bluetooth to receive audio from Meta Ray-Ban Smart Glasses.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>MWDAT</key>
 	<dict>
 		<key>AppLinkURLScheme</key>
