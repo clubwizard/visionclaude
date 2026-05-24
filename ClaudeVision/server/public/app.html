@@ -70,6 +70,18 @@
     }
     #vision-badge.off { color: #7B7468; }
     #vision-badge.err { color: #E89A6B; }
+    #vision-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 13px;
+      color: #7B7468;
+      user-select: none;
+    }
+    #vision-toggle { width: 16px; height: 16px; accent-color: #6FE3A8; cursor: pointer; }
+    #vision-toggle-row label { cursor: pointer; }
     #vision-status {
       font-family: ui-monospace, monospace;
       font-size: 12px;
@@ -233,6 +245,8 @@
       </div>
       <div id="diag-list"></div>
       <div id="diag-footer">
+        <button id="diag-tone">Test tone</button>
+        <button id="diag-tts">Test TTS</button>
         <button id="diag-refresh">Re-run</button>
         <button id="diag-copy" class="primary">Copy</button>
       </div>
@@ -243,6 +257,10 @@
     <video id="preview" autoplay playsinline muted></video>
     <div id="preview-placeholder">Tap Talk to enable camera</div>
     <div id="vision-badge" class="off">Vision off</div>
+  </div>
+  <div id="vision-toggle-row">
+    <input type="checkbox" id="vision-toggle" checked />
+    <label for="vision-toggle">Send camera frames to Claude</label>
   </div>
   <canvas id="snap" hidden></canvas>
   <div id="vision-status"></div>
@@ -266,6 +284,11 @@
     const placeholderEl = document.getElementById('preview-placeholder');
     const visionBadge = document.getElementById('vision-badge');
     const visionStatus = document.getElementById('vision-status');
+    const visionToggle = document.getElementById('vision-toggle');
+
+    const VISION_KEY = 'aside_vision_enabled';
+    visionToggle.checked = localStorage.getItem(VISION_KEY) !== '0';
+    function visionEnabled() { return visionToggle.checked; }
 
     function setVisionStatus(text, kind /* 'ok' | 'err' | '' */) {
       visionStatus.textContent = text;
@@ -351,6 +374,8 @@
     }
 
     async function ensureCamera() {
+      // User opted out — keep the camera fully off.
+      if (!visionEnabled()) return false;
       // Stale stream check: cached track may have ended while backgrounded.
       if (videoStream && !streamIsLive(videoStream)) teardownStream();
       if (videoStream) return true;
@@ -415,6 +440,33 @@
       ctx.drawImage(previewEl, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       return dataUrl.replace(/^data:image\/jpeg;base64,/, '');
+    }
+
+    visionToggle.addEventListener('change', () => {
+      localStorage.setItem(VISION_KEY, visionToggle.checked ? '1' : '0');
+      if (visionToggle.checked) {
+        placeholderEl.textContent = 'Tap Talk to enable camera';
+        placeholderEl.style.display = '';
+        visionBadge.textContent = 'Vision off';
+        visionBadge.classList.add('off');
+        visionBadge.classList.remove('err');
+        setVisionStatus('', '');
+      } else {
+        teardownStream();
+        placeholderEl.textContent = 'Camera disabled';
+        placeholderEl.style.display = '';
+        visionBadge.textContent = 'Vision disabled';
+        visionBadge.classList.add('off');
+        visionBadge.classList.remove('err');
+        setVisionStatus('Camera disabled — chat will be voice only', '');
+      }
+    });
+
+    // Apply initial toggle state (in case the user opted out previously)
+    if (!visionEnabled()) {
+      placeholderEl.textContent = 'Camera disabled';
+      visionBadge.textContent = 'Vision disabled';
+      setVisionStatus('Camera disabled — chat will be voice only', '');
     }
 
     // Session check on load
@@ -660,7 +712,7 @@
           body: JSON.stringify({ text: '' }),
         });
         let detail, state;
-        if (r.status === 400)       { detail = 'reachable (route validated empty input)'; state = true; }
+        if (r.status === 400)       { detail = 'Deepgram TTS configured · server reachable (use Test TTS to verify audio)'; state = true; }
         else if (r.status === 503)  { detail = 'DEEPGRAM_API_KEY not set — browser SpeechSynthesis fallback in use'; state = null; }
         else if (r.status === 401)  { detail = 'unauthorized — session invalid'; state = false; }
         else                        { detail = `HTTP ${r.status}`; state = r.ok; }
@@ -686,6 +738,51 @@
     document.getElementById('diag-close').onclick = () => diagOverlay.classList.remove('open');
     diagOverlay.onclick = (e) => { if (e.target === diagOverlay) diagOverlay.classList.remove('open'); };
     document.getElementById('diag-refresh').onclick = runDiagnostics;
+
+    // Test tone — WebAudio beep, no API cost. Verifies the audio route
+    // (BT vs speaker vs silent switch) without involving Deepgram at all.
+    document.getElementById('diag-tone').onclick = async () => {
+      const btn = document.getElementById('diag-tone');
+      const orig = btn.textContent;
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new Ctx();
+        if (ctx.state === 'suspended') await ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+        btn.textContent = 'Playing…';
+        setTimeout(() => { btn.textContent = orig; ctx.close(); }, 700);
+      } catch (e) {
+        btn.textContent = 'Failed';
+        console.warn('[diag] tone failed', e);
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      }
+    };
+
+    // Test TTS — full Deepgram round-trip via the same speak() the chat uses.
+    // Costs one short Deepgram credit.
+    document.getElementById('diag-tts').onclick = async () => {
+      const btn = document.getElementById('diag-tts');
+      const orig = btn.textContent;
+      btn.textContent = 'Speaking…';
+      try {
+        await speak('Audio test. One, two, three.');
+        btn.textContent = 'Done';
+      } catch (e) {
+        btn.textContent = 'Failed';
+        console.warn('[diag] tts failed', e);
+      }
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    };
+
     document.getElementById('diag-copy').onclick = async () => {
       const text = lastDiagRows.map(([l, s, d]) => `${s === true ? 'OK ' : s === false ? 'FAIL' : '?  '} ${l}${d ? '\n     ' + d : ''}`).join('\n');
       const btn = document.getElementById('diag-copy');
