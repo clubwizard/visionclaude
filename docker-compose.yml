@@ -5,3 +5,10 @@ services:
     ports:
       - "127.0.0.1:18790:18790"
     env_file: .env
+    environment:
+      - DATA_DIR=/app/data
+    volumes:
+      - aside-data:/app/data
+
+volumes:
+  aside-data:

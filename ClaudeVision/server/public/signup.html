@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Aside — Sign up</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Instrument+Serif:ital@0&display=swap" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: #F4EFE5;
+      font-family: 'Inter Tight', sans-serif;
+      color: #1A1714;
+    }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      padding: 36px 32px;
+      background: #fff;
+      border-radius: 18px;
+      border: 1px solid #D9D1C0;
+    }
+    h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 36px; margin-bottom: 8px; letter-spacing: -0.02em; }
+    .sub { color: #7B7468; font-size: 14px; line-height: 1.55; margin-bottom: 24px; }
+    label { display: block; font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #7B7468; margin-bottom: 6px; }
+    input { width: 100%; padding: 13px 14px; border-radius: 10px; border: 1px solid #D9D1C0; background: #FFFDF8; color: #1A1714; font-size: 16px; font-family: inherit; margin-bottom: 16px; }
+    input:focus { outline: 2px solid #6FE3A8; outline-offset: 1px; }
+    .err { color: #C25A2B; font-size: 13px; margin: -8px 0 12px; }
+    button { width: 100%; padding: 14px; border: none; border-radius: 10px; background: #6FE3A8; color: #1A1714; font-size: 15px; font-weight: 500; font-family: inherit; cursor: pointer; }
+    button[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .no-token { padding: 24px; background: #FFF7EA; border-radius: 12px; color: #7B5F2A; font-size: 14px; line-height: 1.6; }
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="form">
+      <h1>Sign up</h1>
+      <p class="sub">You'll need an invite from an Aside admin. The token below comes from the invite link they sent you.</p>
+      <form id="signup-form">
+        <label>Token</label>
+        <input id="token" type="text" readonly />
+        <label>Email</label>
+        <input id="email" type="email" autocomplete="email" required />
+        <label>Password (8+ chars)</label>
+        <input id="password" type="password" autocomplete="new-password" minlength="8" required />
+        <div id="err" class="err" hidden></div>
+        <button id="submit" type="submit">Create account</button>
+      </form>
+      <p style="margin-top:18px;font-size:13px;color:#7B7468">Already have an account? <a href="/">Log in</a>.</p>
+    </div>
+    <div id="no-token" class="no-token" hidden>
+      <strong>This signup link is missing a token.</strong><br />
+      Ask an Aside admin for an invite. They can mint one from their Account page.
+    </div>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token') || '';
+    const tokenInput = document.getElementById('token');
+    const errEl = document.getElementById('err');
+    const submitBtn = document.getElementById('submit');
+
+    if (!token) {
+      document.getElementById('form').hidden = true;
+      document.getElementById('no-token').hidden = false;
+    } else {
+      tokenInput.value = token;
+    }
+
+    document.getElementById('signup-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errEl.hidden = true;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating…';
+      try {
+        const res = await fetch('/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token,
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          window.location.href = '/account?welcome=1';
+          return;
+        }
+        errEl.textContent = data?.error || 'Signup failed.';
+        errEl.hidden = false;
+      } catch (e) {
+        errEl.textContent = 'Network error. Try again.';
+        errEl.hidden = false;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create account';
+      }
+    });
+  </script>
+</body>
+</html>

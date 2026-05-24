@@ -11,12 +11,14 @@ import type {
 const MAX_TOOL_ITERATIONS = 10;
 
 export class ClaudeClient {
-  private anthropic: Anthropic;
   private mcpManager: MCPManager;
   private config: ServerConfig;
+  // Cache per-key Anthropic instances so we don't reconstruct on every call.
+  // Keyed by API key directly — when a user rotates, the old entry just sits
+  // unused (small fixed memory cost).
+  private clients = new Map<string, Anthropic>();
 
   constructor(mcpManager: MCPManager, config: ServerConfig) {
-    this.anthropic = new Anthropic();
     this.mcpManager = mcpManager;
     this.config = config;
   }
@@ -29,11 +31,23 @@ export class ClaudeClient {
     return { ...this.config };
   }
 
+  private getAnthropic(apiKey: string): Anthropic {
+    let client = this.clients.get(apiKey);
+    if (!client) {
+      client = new Anthropic({ apiKey });
+      this.clients.set(apiKey, client);
+    }
+    return client;
+  }
+
   async chat(
     history: MessageParam[],
     text: string,
-    images?: string[]
+    images: string[] | undefined,
+    apiKey: string
   ): Promise<{ responseText: string; toolCalls: ToolCallResult[] }> {
+    const anthropic = this.getAnthropic(apiKey);
+
     // Build the user message content
     const content: Anthropic.ContentBlockParam[] = [];
 
@@ -68,7 +82,7 @@ export class ClaudeClient {
     let currentMessages = messages;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      const response = await this.anthropic.messages.create({
+      const response = await anthropic.messages.create({
         model: this.config.model,
         max_tokens: this.config.maxTokens,
         system: this.config.systemPrompt,

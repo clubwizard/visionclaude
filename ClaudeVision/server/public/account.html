@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Aside — Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Instrument+Serif:ital@0&display=swap" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      padding: 32px 20px 48px;
+      padding-top: calc(32px + env(safe-area-inset-top));
+      background: #F4EFE5;
+      font-family: 'Inter Tight', sans-serif;
+      color: #1A1714;
+    }
+    .wrap { max-width: 600px; margin: 0 auto; }
+    h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 40px; letter-spacing: -0.02em; margin-bottom: 6px; }
+    .me { color: #7B7468; font-size: 13px; margin-bottom: 28px; }
+    .me a { color: inherit; }
+    .card { background: #fff; border: 1px solid #D9D1C0; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 22px; margin-bottom: 6px; letter-spacing: -0.01em; }
+    .card .hint { color: #7B7468; font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+    label { display: block; font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #7B7468; margin-bottom: 6px; }
+    .row { display: flex; gap: 8px; align-items: stretch; margin-bottom: 6px; }
+    .row input { flex: 1; padding: 11px 13px; border-radius: 9px; border: 1px solid #D9D1C0; background: #FFFDF8; font-size: 15px; font-family: inherit; }
+    .row input:focus { outline: 2px solid #6FE3A8; outline-offset: 1px; }
+    .row button { padding: 11px 14px; border: 1px solid #D9D1C0; background: #fff; border-radius: 9px; cursor: pointer; font-size: 13px; font-family: inherit; color: #1A1714; }
+    .row button.primary { background: #6FE3A8; border-color: #6FE3A8; font-weight: 500; }
+    .row button.danger { background: #fff; color: #C25A2B; border-color: #E89A6B; }
+    .row button:hover { filter: brightness(0.95); }
+    .status { font-size: 12px; color: #7B7468; margin-bottom: 18px; }
+    .status .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-family: ui-monospace, monospace; font-size: 11px; margin-left: 6px; }
+    .pill.set { background: #DDF7E5; color: #2F8A57; }
+    .pill.unset { background: #FFE6D3; color: #C25A2B; }
+    .invites { margin-top: 18px; }
+    .invite-row { display: flex; gap: 8px; align-items: center; padding: 10px 12px; background: #FAF6EC; border-radius: 8px; margin-bottom: 6px; font-size: 12px; font-family: ui-monospace, monospace; }
+    .invite-row code { flex: 1; word-break: break-all; }
+    .invite-row.used { opacity: 0.5; }
+    .invite-row button { padding: 4px 10px; border: 1px solid #D9D1C0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-family: inherit; }
+    .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
+    .logout { background: transparent; border: 1px solid #D9D1C0; color: #7B7468; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-family: inherit; cursor: pointer; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1A1714; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity 0.2s; }
+    .toast.show { opacity: 1; }
+    .links { font-size: 13px; color: #7B7468; }
+    .links a { color: inherit; margin-right: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>Account</h1>
+        <div class="me" id="me">Loading…</div>
+      </div>
+      <button class="logout" id="logout">Log out</button>
+    </div>
+
+    <div class="card">
+      <h2>API keys</h2>
+      <div class="hint">Aside uses your own Anthropic and Deepgram keys. They're encrypted at rest with the server's master key.</div>
+
+      <div class="status">Anthropic <span id="anthropic-status" class="pill unset">unset</span></div>
+      <label>Anthropic API key</label>
+      <div class="row">
+        <input id="anthropic-input" type="password" placeholder="sk-ant-…" autocomplete="off" />
+        <button class="primary" id="anthropic-save">Save</button>
+        <button class="danger" id="anthropic-clear">Clear</button>
+      </div>
+
+      <div style="height:18px"></div>
+
+      <div class="status">Deepgram <span id="deepgram-status" class="pill unset">unset</span></div>
+      <label>Deepgram API key</label>
+      <div class="row">
+        <input id="deepgram-input" type="password" placeholder="(starts with letters/digits)" autocomplete="off" />
+        <button class="primary" id="deepgram-save">Save</button>
+        <button class="danger" id="deepgram-clear">Clear</button>
+      </div>
+    </div>
+
+    <div class="card" id="admin-card" hidden>
+      <h2>Invites</h2>
+      <div class="hint">Generate a one-time invite link, then share it with the new user. Links expire in 7 days.</div>
+      <button class="primary" id="new-invite" style="padding:10px 16px;border-radius:9px;border:1px solid #6FE3A8;background:#6FE3A8;cursor:pointer;font-family:inherit;font-size:13px">New invite</button>
+      <div class="invites" id="invite-list"></div>
+    </div>
+
+    <div class="links">
+      <a href="/app">← Back to voice client</a>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const toast = (msg) => {
+      const t = $('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 1800);
+    };
+
+    async function loadMe() {
+      const res = await fetch('/auth/check');
+      const data = await res.json();
+      if (!data.authenticated) { window.location.href = '/'; return; }
+      $('me').innerHTML = `${data.user.email} ${data.user.isAdmin ? '<span style="color:#6FE3A8">· admin</span>' : ''}`;
+      setStatus('anthropic', data.keys?.anthropic);
+      setStatus('deepgram', data.keys?.deepgram);
+      if (data.user.isAdmin) {
+        $('admin-card').hidden = false;
+        loadInvites();
+      }
+      if (new URLSearchParams(location.search).get('welcome')) {
+        toast('Welcome to Aside. Paste your API keys below.');
+      }
+    }
+
+    function setStatus(slot, state) {
+      const el = $(`${slot}-status`);
+      el.textContent = state === 'set' ? 'set' : 'unset';
+      el.className = `pill ${state === 'set' ? 'set' : 'unset'}`;
+    }
+
+    async function saveKey(slot) {
+      const value = $(`${slot}-input`).value.trim();
+      if (!value) { toast('Paste the key first.'); return; }
+      const res = await fetch('/me/api-keys', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [slot]: value }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast(d?.error || 'Save failed'); return; }
+      const data = await res.json();
+      setStatus(slot, data.keys?.[slot]);
+      $(`${slot}-input`).value = '';
+      toast(`${slot[0].toUpperCase() + slot.slice(1)} key saved.`);
+    }
+
+    async function clearKey(slot) {
+      if (!confirm(`Clear the stored ${slot} key?`)) return;
+      const res = await fetch('/me/api-keys', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [slot]: '' }),
+      });
+      const data = await res.json();
+      setStatus(slot, data.keys?.[slot]);
+      toast(`${slot[0].toUpperCase() + slot.slice(1)} key cleared.`);
+    }
+
+    async function loadInvites() {
+      const res = await fetch('/admin/invites');
+      if (!res.ok) return;
+      const { invites } = await res.json();
+      const list = $('invite-list');
+      list.innerHTML = '';
+      for (const inv of invites) {
+        const row = document.createElement('div');
+        row.className = 'invite-row' + (inv.used ? ' used' : '');
+        const url = `${location.origin}/signup?token=${inv.token}`;
+        row.innerHTML = `
+          <code>${inv.used ? '(used) ' : ''}${url}</code>
+          ${inv.used ? '' : `<button data-token="${inv.token}" data-action="copy">Copy</button>
+                              <button data-token="${inv.token}" data-action="revoke">Revoke</button>`}
+        `;
+        list.appendChild(row);
+      }
+      list.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const token = btn.dataset.token;
+        if (btn.dataset.action === 'copy') {
+          const url = `${location.origin}/signup?token=${token}`;
+          try { await navigator.clipboard.writeText(url); toast('Invite link copied'); } catch { toast('Copy failed'); }
+        } else if (btn.dataset.action === 'revoke') {
+          if (!confirm('Revoke this invite?')) return;
+          await fetch(`/admin/invites/${token}`, { method: 'DELETE' });
+          loadInvites();
+        }
+      }, { once: true });
+    }
+
+    $('anthropic-save').onclick = () => saveKey('anthropic');
+    $('anthropic-clear').onclick = () => clearKey('anthropic');
+    $('deepgram-save').onclick = () => saveKey('deepgram');
+    $('deepgram-clear').onclick = () => clearKey('deepgram');
+    $('new-invite').onclick = async () => {
+      const res = await fetch('/admin/invites', { method: 'POST' });
+      const data = await res.json();
+      const url = `${location.origin}${data.signupUrl}`;
+      try { await navigator.clipboard.writeText(url); toast('Invite link copied to clipboard'); } catch { toast('Invite created — see list below'); }
+      loadInvites();
+    };
+    $('logout').onclick = async () => {
+      await fetch('/auth/logout', { method: 'POST' });
+      window.location.href = '/';
+    };
+
+    loadMe();
+  </script>
+</body>
+</html>

@@ -16,6 +16,11 @@ import { createConfigRouter } from "./routes/config.js";
 import { createToolsRouter } from "./routes/tools.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createVoiceRouter } from "./routes/voice.js";
+import { createMeRouter } from "./routes/me.js";
+import { createAdminRouter } from "./routes/admin.js";
+import { getDb, closeDb } from "./db.js";
+import { countUsers, createUser, findUserByEmail } from "./users.js";
+import { suggestMasterKey } from "./crypto.js";
 import type { ServerConfig } from "./types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -42,8 +47,41 @@ TOOLS:
 const DEFAULT_SYSTEM_PROMPT =
   process.env.VOICE_ASSISTANT_PROMPT?.trim() || BUILT_IN_SYSTEM_PROMPT;
 
+function bootstrapAdminIfNeeded(): void {
+  // On first run, create the admin user from BOOTSTRAP_ADMIN_EMAIL +
+  // BOOTSTRAP_ADMIN_PASSWORD. Idempotent: if a user with that email
+  // already exists we just promote them to admin if they weren't.
+  if (countUsers() > 0) return;
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim();
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD?.trim();
+  if (!email || !password) {
+    console.log(
+      c.warn(
+        "[Bootstrap] No users yet. Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD in .env on first run to create the admin."
+      )
+    );
+    return;
+  }
+  if (findUserByEmail(email)) return;
+  createUser({ email, password, isAdmin: true });
+  console.log(c.success(`[Bootstrap] Admin user created: ${email}`));
+  console.log(c.dim("   Remove BOOTSTRAP_ADMIN_* from .env now — login from the web UI."));
+}
+
 async function main() {
   showBanner();
+
+  // Warn the operator if envelope-encryption is unconfigured — startup
+  // still proceeds, but any attempt to store a user key will throw.
+  if (!process.env.KEYS_ENCRYPTION_KEY?.trim()) {
+    console.log(c.warn("[Crypto] KEYS_ENCRYPTION_KEY is not set in .env."));
+    console.log(c.dim("   Suggested value: " + suggestMasterKey()));
+    console.log(c.dim("   Add it to .env and restart. The server starts without it but storing API keys will fail."));
+  }
+
+  // Open DB + run migrations + create bootstrap admin if first run
+  getDb();
+  bootstrapAdminIfNeeded();
 
   const mcpManager = new MCPManager();
   await mcpManager.initialize();
@@ -71,33 +109,45 @@ async function main() {
   // ── Session ──
   app.use(session({
     name: "sid",
-    secret: process.env.SESSION_SECRET || process.env.ADMIN_PASSWORD || "aside-session-secret",
+    secret: process.env.SESSION_SECRET || "aside-session-secret-change-me",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false, // Nginx handles HTTPS at the edge
+      secure: false,
       sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
     },
   }));
 
   // ── Public: static landing page ──
   app.use(express.static(path.join(__dirname, "../public")));
 
-  // ── Public: auth endpoints ──
+  // ── Public: auth + signup ──
   app.use("/auth", createAuthRouter());
 
   // ── Public: health ──
   app.use("/health", createHealthRouter(mcpManager, conversations, skillLoader));
 
-  // ── Voice chat page (client-side auth check in app.html) ──
+  // ── Static HTML for voice client, signup, account ──
   app.get("/app", (_req, res) => {
     res.sendFile(path.join(__dirname, "../public/app.html"));
+  });
+  app.get("/signup", (_req, res) => {
+    res.sendFile(path.join(__dirname, "../public/signup.html"));
+  });
+  app.get("/account", (_req, res) => {
+    res.sendFile(path.join(__dirname, "../public/account.html"));
   });
 
   // ── Rate limiter (applied to all API routes below) ──
   app.use(rateLimiter(30));
+
+  // ── User self-service: /me/api-keys etc. ──
+  app.use("/me", createMeRouter());
+
+  // ── Admin: invites + user list ──
+  app.use("/admin", createAdminRouter());
 
   // ── Session or gateway key: chat + voice ──
   app.use("/chat", requireAnyAuth, createChatRouter(claudeClient, conversations, requestQueue));
@@ -129,6 +179,7 @@ async function main() {
   const shutdown = async () => {
     console.log(c.orange("\n   ▸ Shutting down VisionClaude Gateway..."));
     conversations.destroy();
+    closeDb();
     await mcpManager.shutdown();
     server.close(() => {
       console.log(c.dim("   Gateway stopped.\n"));

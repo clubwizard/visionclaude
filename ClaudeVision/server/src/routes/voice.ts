@@ -1,4 +1,5 @@
-import express, { Router } from "express";
+import express, { Router, type Request } from "express";
+import { getUserApiKey } from "../users.js";
 
 const ALLOWED_VOICES = new Set([
   "aura-asteria-en", "aura-luna-en", "aura-stella-en", "aura-athena-en", "aura-hera-en",
@@ -7,16 +8,29 @@ const ALLOWED_VOICES = new Set([
 ]);
 const DEFAULT_VOICE = "aura-asteria-en";
 
+// Resolves the caller's Deepgram key. Logged-in users use their own;
+// otherwise we fall back to the env var (operator-managed shared use).
+function resolveDeepgramKey(req: Request): string | null {
+  const userId = req.session?.userId;
+  if (userId) {
+    return getUserApiKey(userId, "deepgram");
+  }
+  return process.env.DEEPGRAM_API_KEY?.trim() || null;
+}
+
 export function createVoiceRouter() {
   const router = Router();
 
   // POST /voice/speak — Deepgram Aura TTS
   router.post("/speak", async (req, res) => {
     const { text, voice } = req.body as { text?: string; voice?: string };
-    const deepgramKey = process.env.DEEPGRAM_API_KEY;
+    const deepgramKey = resolveDeepgramKey(req);
 
     if (!deepgramKey) {
-      res.status(503).json({ error: "DEEPGRAM_API_KEY not configured" });
+      res.status(503).json({
+        error:
+          "No Deepgram API key configured. Add yours on the Account page (browser TTS will be used as fallback).",
+      });
       return;
     }
     if (!text) {
@@ -24,7 +38,6 @@ export function createVoiceRouter() {
       return;
     }
 
-    // Allowlist the voice to keep the URL parameter trustworthy.
     const model = voice && ALLOWED_VOICES.has(voice) ? voice : DEFAULT_VOICE;
 
     try {
@@ -58,10 +71,10 @@ export function createVoiceRouter() {
     "/transcribe",
     express.raw({ type: "*/*", limit: "10mb" }),
     async (req, res) => {
-      const deepgramKey = process.env.DEEPGRAM_API_KEY;
+      const deepgramKey = resolveDeepgramKey(req);
 
       if (!deepgramKey) {
-        res.status(503).json({ error: "DEEPGRAM_API_KEY not configured" });
+        res.status(503).json({ error: "No Deepgram API key configured." });
         return;
       }
 

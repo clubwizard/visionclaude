@@ -161,7 +161,7 @@
       min-height: 48px;
       padding: 0 24px;
     }
-    #logout, #diag-open {
+    #logout, #diag-open, #account-link {
       background: transparent;
       border: 1px solid #D9D1C0;
       color: #7B7468;
@@ -171,7 +171,7 @@
       border-radius: 999px;
       cursor: pointer;
     }
-    #logout:hover, #diag-open:hover { border-color: #7B7468; }
+    #logout:hover, #diag-open:hover, #account-link:hover { border-color: #7B7468; }
     #diag-overlay {
       position: fixed;
       inset: 0;
@@ -267,6 +267,7 @@
 <body>
   <header id="topbar">
     <button id="diag-open">Diagnostics</button>
+    <button id="account-link" onclick="window.location.href='/account'">Account</button>
     <button id="logout">Log out</button>
   </header>
 

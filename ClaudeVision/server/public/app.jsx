@@ -510,12 +510,13 @@ const Footer = ({ p }) => (
 // Login modal (interactive)
 // ───────────────────────────────────────────────────────────────
 const LoginModal = ({ open, onClose, p, accent }) => {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!open) { setPassword(""); setError(""); setLoading(false); }
+    if (!open) { setEmail(""); setPassword(""); setError(""); setLoading(false); }
   }, [open]);
 
   if (!open) return null;
@@ -528,12 +529,13 @@ const LoginModal = ({ open, onClose, p, accent }) => {
       const res = await fetch("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
         window.location.href = "/app";
       } else {
-        setError("Incorrect password.");
+        const data = await res.json().catch(() => ({}));
+        setError(data?.error || "Incorrect email or password.");
         setLoading(false);
       }
     } catch {
@@ -562,24 +564,34 @@ const LoginModal = ({ open, onClose, p, accent }) => {
           Log in to <em>Aside</em>.
         </h3>
         <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 14, color: p.muted, lineHeight: 1.5, margin: "0 0 28px" }}>
-          Enter your password to access the voice interface.
+          Sign in with your account email and password. New here? You'll need an invite from an admin.
         </p>
         <form onSubmit={submit}>
+          <label style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, letterSpacing: "0.1em", color: p.muted, textTransform: "uppercase" }}>
+            Email
+          </label>
+          <input
+            autoFocus type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, marginBottom: 14, padding: "14px 16px", borderRadius: 10,
+              border: `1px solid ${error ? "#e05" : p.line}`, background: p.panel, color: p.ink,
+              fontFamily: "'Inter Tight', sans-serif", fontSize: 16, outline: "none", boxSizing: "border-box"
+            }} />
           <label style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, letterSpacing: "0.1em", color: p.muted, textTransform: "uppercase" }}>
             Password
           </label>
           <input
-            autoFocus type="password" value={password} onChange={e => setPassword(e.target.value)}
+            type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)}
             style={{
               width: "100%", marginTop: 6, padding: "14px 16px", borderRadius: 10,
               border: `1px solid ${error ? "#e05" : p.line}`, background: p.panel, color: p.ink,
               fontFamily: "'Inter Tight', sans-serif", fontSize: 16, outline: "none", boxSizing: "border-box"
             }} />
           {error && <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 13, color: "#e05", margin: "8px 0 0" }}>{error}</p>}
-          <button type="submit" disabled={loading || !password} style={{
+          <button type="submit" disabled={loading || !email || !password} style={{
             marginTop: 16, width: "100%", padding: "14px", borderRadius: 10, border: "none",
             background: accent, color: p.ink, fontFamily: "'Inter Tight', sans-serif", fontSize: 15, fontWeight: 500,
-            cursor: loading ? "wait" : "pointer", opacity: !password ? 0.5 : 1
+            cursor: loading ? "wait" : "pointer", opacity: (!email || !password) ? 0.5 : 1
           }}>
             {loading ? "Checking…" : "Log in →"}
           </button>
