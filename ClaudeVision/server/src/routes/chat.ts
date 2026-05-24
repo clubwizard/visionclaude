@@ -10,18 +10,35 @@ const MAX_VISION_CONTEXT_IMAGES = Math.max(
   parseInt(process.env.MAX_VISION_CONTEXT_IMAGES || "2", 10)
 );
 
-// Resolves the caller's identity and Anthropic key. Logged-in user uses
-// their own stored key; native gateway-keyed clients fall back to env
-// (operator-managed shared use). Conversation scope is namespaced so one
-// caller cannot read another's history even by guessing the id.
+// Resolves the caller's identity and Anthropic key.
+//
+// Resolution order:
+//   1. Logged-in user with their own stored key → use it.
+//   2. Logged-in ADMIN with no stored key → fall back to the env-var key
+//      (the operator's bootstrap key, so the admin account works out of
+//      the box without copying secrets through the UI).
+//   3. Native gateway-keyed client (X-Gateway-Key, no session) → env-var
+//      key. This is the iOS app path.
+//
+// Non-admin users must BYO — the env-var fallback is intentionally NOT
+// shared with invitees, otherwise every invitee would silently bill the
+// operator's Anthropic account.
+//
+// Conversation scope is namespaced so one caller cannot read another's
+// history even by guessing the id.
 function resolveCaller(req: Request): {
   scope: string;
   anthropicKey: string | null;
 } {
   const userId = req.session?.userId;
   if (userId) {
-    const key = getUserApiKey(userId, "anthropic");
-    return { scope: `user:${userId}`, anthropicKey: key };
+    const own = getUserApiKey(userId, "anthropic");
+    if (own) return { scope: `user:${userId}`, anthropicKey: own };
+    if (req.session?.isAdmin) {
+      const envKey = process.env.ANTHROPIC_API_KEY?.trim() || null;
+      return { scope: `user:${userId}`, anthropicKey: envKey };
+    }
+    return { scope: `user:${userId}`, anthropicKey: null };
   }
   const envKey = process.env.ANTHROPIC_API_KEY?.trim() || null;
   return { scope: "gateway", anthropicKey: envKey };

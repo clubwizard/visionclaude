@@ -37,6 +37,7 @@
     #status {
       font-size: 13px;
       color: #7B7468;
+      margin-top: 28px;
       margin-bottom: 32px;
       font-family: ui-monospace, monospace;
       letter-spacing: 0.08em;
@@ -89,8 +90,8 @@
     #vision-toggle-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-top: 12px;
+      gap: 10px;
+      margin-top: 22px;
       font-family: 'Inter Tight', sans-serif;
       font-size: 13px;
       color: #7B7468;
@@ -101,8 +102,8 @@
     #voice-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-top: 8px;
+      gap: 10px;
+      margin-top: 14px;
       font-family: 'Inter Tight', sans-serif;
       font-size: 13px;
       color: #7B7468;
@@ -172,6 +173,25 @@
       cursor: pointer;
     }
     #logout:hover, #diag-open:hover, #account-link:hover { border-color: #7B7468; }
+    #setup-banner {
+      position: fixed;
+      top: calc(56px + env(safe-area-inset-top));
+      left: 16px;
+      right: 16px;
+      z-index: 15;
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: #FFF1DA;
+      border: 1px solid #E89A6B;
+      color: #7B5F2A;
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      text-align: center;
+    }
+    #setup-banner a { color: #C25A2B; font-weight: 500; text-decoration: underline; }
+    #talk.disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.4); }
+    #talk.disabled:hover { transform: none; box-shadow: none; }
     #diag-overlay {
       position: fixed;
       inset: 0;
@@ -270,6 +290,10 @@
     <button id="account-link" onclick="window.location.href='/account'">Account</button>
     <button id="logout">Log out</button>
   </header>
+  <div id="setup-banner" hidden>
+    <strong>Set up required.</strong> Add your Anthropic API key on the
+    <a href="/account">Account page</a> before you can talk to Claude.
+  </div>
 
   <div id="diag-overlay" role="dialog" aria-modal="true">
     <div id="diag-panel">
@@ -533,10 +557,32 @@
     });
     if (!visionEnabled()) applyVisionToggleUI();
 
-    // Session check on load
+    // Session + key-readiness check on load. If the user has no usable
+    // Anthropic key (own or admin-env), disable Talk and show the setup
+    // banner so they don't tap a dead button.
+    let canChat = false;
+    function applyChatReadiness(authData) {
+      canChat = !!authData?.canChat;
+      const banner = document.getElementById('setup-banner');
+      if (!canChat) {
+        banner.hidden = false;
+        talkBtn.classList.add('disabled');
+        talkBtn.setAttribute('aria-disabled', 'true');
+        talkBtn.title = 'Add your Anthropic API key first';
+        status.textContent = 'Setup required';
+      } else {
+        banner.hidden = true;
+        talkBtn.classList.remove('disabled');
+        talkBtn.removeAttribute('aria-disabled');
+        talkBtn.title = '';
+      }
+    }
     fetch('/auth/check')
       .then(r => r.json())
-      .then(d => { if (!d.authenticated) window.location.href = '/'; });
+      .then(d => {
+        if (!d.authenticated) { window.location.href = '/'; return; }
+        applyChatReadiness(d);
+      });
 
     // Logout
     document.getElementById('logout').onclick = () => {
@@ -660,8 +706,17 @@
           responseEl.textContent = reply;
           status.textContent = 'Ready';
           await speak(reply);
-        } catch {
-          status.textContent = 'Error — try again';
+        } catch (e) {
+          // 412 from /chat means the key disappeared between page load and
+          // now (e.g. the user cleared it on /account in another tab).
+          // Re-gate the button and show the setup banner instead of a
+          // useless "try again" message.
+          if (lastChat?.status === 412) {
+            canChat = false;
+            applyChatReadiness({ canChat: false });
+          } else {
+            status.textContent = 'Error — try again';
+          }
         }
       };
 
@@ -704,6 +759,10 @@
     talkBtn.onclick = async () => {
       if (isListening) {
         recognition?.stop();
+        return;
+      }
+      if (!canChat) {
+        status.textContent = 'Setup required — see Account';
         return;
       }
       // Prime the AudioContext inside the user gesture so iOS Safari lets

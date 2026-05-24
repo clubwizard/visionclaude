@@ -80,6 +80,34 @@ export function listUsers(): User[] {
   return rows.map(rowToUser);
 }
 
+export function countAdmins(): number {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT COUNT(*) AS c FROM users WHERE is_admin = 1")
+    .get() as { c: number };
+  return row.c;
+}
+
+export function deleteUser(id: string): boolean {
+  const db = getDb();
+  // Free up any unused invites this user issued so they can be reused.
+  // Used invites stay so the audit trail (created_by, used_by) survives.
+  const tx = db.transaction(() => {
+    db.prepare("DELETE FROM invites WHERE created_by = ? AND used_by IS NULL").run(id);
+    const r = db.prepare("DELETE FROM users WHERE id = ?").run(id);
+    return r.changes > 0;
+  });
+  return tx();
+}
+
+export function setAdminFlag(id: string, isAdmin: boolean): boolean {
+  const db = getDb();
+  const r = db
+    .prepare("UPDATE users SET is_admin = ? WHERE id = ?")
+    .run(isAdmin ? 1 : 0, id);
+  return r.changes > 0;
+}
+
 export interface CreateUserInput {
   email: string;
   password: string;

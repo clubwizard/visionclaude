@@ -16,32 +16,64 @@
       font-family: 'Inter Tight', sans-serif;
       color: #1A1714;
     }
-    .wrap { max-width: 600px; margin: 0 auto; }
+    .wrap { max-width: 640px; margin: 0 auto; }
     h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 40px; letter-spacing: -0.02em; margin-bottom: 6px; }
     .me { color: #7B7468; font-size: 13px; margin-bottom: 28px; }
     .me a { color: inherit; }
-    .card { background: #fff; border: 1px solid #D9D1C0; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+    .card { background: #fff; border: 1px solid #D9D1C0; border-radius: 16px; padding: 26px; margin-bottom: 22px; }
     .card h2 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 22px; margin-bottom: 6px; letter-spacing: -0.01em; }
-    .card .hint { color: #7B7468; font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+    .card .hint { color: #7B7468; font-size: 13px; line-height: 1.55; margin-bottom: 20px; }
+    .card .hint a { color: #C25A2B; }
     label { display: block; font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #7B7468; margin-bottom: 6px; }
-    .row { display: flex; gap: 8px; align-items: stretch; margin-bottom: 6px; }
-    .row input { flex: 1; padding: 11px 13px; border-radius: 9px; border: 1px solid #D9D1C0; background: #FFFDF8; font-size: 15px; font-family: inherit; }
-    .row input:focus { outline: 2px solid #6FE3A8; outline-offset: 1px; }
-    .row button { padding: 11px 14px; border: 1px solid #D9D1C0; background: #fff; border-radius: 9px; cursor: pointer; font-size: 13px; font-family: inherit; color: #1A1714; }
-    .row button.primary { background: #6FE3A8; border-color: #6FE3A8; font-weight: 500; }
-    .row button.danger { background: #fff; color: #C25A2B; border-color: #E89A6B; }
-    .row button:hover { filter: brightness(0.95); }
-    .status { font-size: 12px; color: #7B7468; margin-bottom: 18px; }
-    .status .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-family: ui-monospace, monospace; font-size: 11px; margin-left: 6px; }
+    .key-block { padding: 16px; background: #FAF6EC; border-radius: 10px; margin-bottom: 14px; }
+    .key-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; font-size: 14px; }
+    .key-head .name { font-weight: 500; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-family: ui-monospace, monospace; font-size: 11px; }
     .pill.set { background: #DDF7E5; color: #2F8A57; }
     .pill.unset { background: #FFE6D3; color: #C25A2B; }
-    .invites { margin-top: 18px; }
+    .pill.env { background: #E3ECFE; color: #3B5BBF; }
+    .row { display: flex; gap: 8px; align-items: stretch; }
+    .row input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #D9D1C0; background: #FFFDF8; font-size: 14px; font-family: inherit; }
+    .row input:focus { outline: 2px solid #6FE3A8; outline-offset: 1px; }
+    .row button { padding: 10px 13px; border: 1px solid #D9D1C0; background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; font-family: inherit; color: #1A1714; }
+    .row button:hover { filter: brightness(0.96); }
+    .row button.primary { background: #6FE3A8; border-color: #6FE3A8; font-weight: 500; }
+    .row button.test { background: #fff; color: #3B5BBF; border-color: #C7D2EE; }
+    .row button.danger { background: #fff; color: #C25A2B; border-color: #E89A6B; }
+    .test-result { font-size: 12px; margin-top: 8px; min-height: 16px; }
+    .test-result.ok { color: #2F8A57; }
+    .test-result.err { color: #C25A2B; }
+    .test-result.busy { color: #7B7468; }
+    .setup-callout {
+      padding: 18px 20px;
+      background: #FFF1DA;
+      border: 1px solid #E89A6B;
+      border-radius: 12px;
+      margin-bottom: 22px;
+      color: #7B5F2A;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .setup-callout strong { color: #1A1714; font-weight: 600; }
+    .setup-callout ol { margin: 10px 0 0 20px; }
+    .setup-callout li { margin-bottom: 4px; }
+    .setup-callout a { color: #C25A2B; }
+    .invites { margin-top: 14px; }
     .invite-row { display: flex; gap: 8px; align-items: center; padding: 10px 12px; background: #FAF6EC; border-radius: 8px; margin-bottom: 6px; font-size: 12px; font-family: ui-monospace, monospace; }
     .invite-row code { flex: 1; word-break: break-all; }
-    .invite-row.used { opacity: 0.5; }
+    .invite-row.used { opacity: 0.55; }
     .invite-row button { padding: 4px 10px; border: 1px solid #D9D1C0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-family: inherit; }
+    .user-row { display: flex; gap: 10px; align-items: center; padding: 12px 14px; background: #FAF6EC; border-radius: 8px; margin-bottom: 6px; font-size: 13px; }
+    .user-row .who { flex: 1; }
+    .user-row .who .email { font-weight: 500; }
+    .user-row .who .meta { color: #7B7468; font-size: 11px; font-family: ui-monospace, monospace; margin-top: 2px; }
+    .user-row button { padding: 6px 12px; border: 1px solid #D9D1C0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .user-row button.danger { color: #C25A2B; border-color: #E89A6B; }
+    .user-row .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #DDF7E5; color: #2F8A57; font-family: ui-monospace, monospace; }
+    .user-row .badge.you { background: #E3ECFE; color: #3B5BBF; }
     .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
     .logout { background: transparent; border: 1px solid #D9D1C0; color: #7B7468; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-family: inherit; cursor: pointer; }
+    .new-invite-btn { padding: 10px 16px; border-radius: 9px; border: 1px solid #6FE3A8; background: #6FE3A8; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
     .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1A1714; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity 0.2s; }
     .toast.show { opacity: 1; }
     .links { font-size: 13px; color: #7B7468; }
@@ -58,34 +90,56 @@
       <button class="logout" id="logout">Log out</button>
     </div>
 
+    <div id="setup-callout" class="setup-callout" hidden>
+      <strong id="setup-title">Welcome to Aside.</strong>
+      <p id="setup-body" style="margin-top:6px"></p>
+      <ol id="setup-steps">
+        <li>Paste your Anthropic API key below and hit <em>Test</em> to verify it.</li>
+        <li>Paste your Deepgram API key (optional — browser TTS works as a fallback).</li>
+        <li>Head to the <a href="/app">voice client</a> and tap Talk.</li>
+      </ol>
+    </div>
+
     <div class="card">
       <h2>API keys</h2>
-      <div class="hint">Aside uses your own Anthropic and Deepgram keys. They're encrypted at rest with the server's master key.</div>
+      <div class="hint">Aside uses <strong>your own</strong> Anthropic and Deepgram keys. They're encrypted at rest with the server's master key; the server can only decrypt them at request time, and never sends them back to your browser. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get an Anthropic key</a> · <a href="https://console.deepgram.com/" target="_blank" rel="noopener">Get a Deepgram key</a>.</div>
 
-      <div class="status">Anthropic <span id="anthropic-status" class="pill unset">unset</span></div>
-      <label>Anthropic API key</label>
-      <div class="row">
-        <input id="anthropic-input" type="password" placeholder="sk-ant-…" autocomplete="off" />
-        <button class="primary" id="anthropic-save">Save</button>
-        <button class="danger" id="anthropic-clear">Clear</button>
+      <div class="key-block">
+        <div class="key-head"><span class="name">Anthropic</span> <span id="anthropic-pill" class="pill unset">unset</span></div>
+        <label for="anthropic-input">API key</label>
+        <div class="row">
+          <input id="anthropic-input" type="password" placeholder="sk-ant-…" autocomplete="off" />
+          <button class="test" id="anthropic-test">Test</button>
+          <button class="primary" id="anthropic-save">Save</button>
+          <button class="danger" id="anthropic-clear">Clear</button>
+        </div>
+        <div id="anthropic-result" class="test-result"></div>
       </div>
 
-      <div style="height:18px"></div>
-
-      <div class="status">Deepgram <span id="deepgram-status" class="pill unset">unset</span></div>
-      <label>Deepgram API key</label>
-      <div class="row">
-        <input id="deepgram-input" type="password" placeholder="(starts with letters/digits)" autocomplete="off" />
-        <button class="primary" id="deepgram-save">Save</button>
-        <button class="danger" id="deepgram-clear">Clear</button>
+      <div class="key-block">
+        <div class="key-head"><span class="name">Deepgram</span> <span id="deepgram-pill" class="pill unset">unset</span></div>
+        <label for="deepgram-input">API key</label>
+        <div class="row">
+          <input id="deepgram-input" type="password" placeholder="(letters + digits)" autocomplete="off" />
+          <button class="test" id="deepgram-test">Test</button>
+          <button class="primary" id="deepgram-save">Save</button>
+          <button class="danger" id="deepgram-clear">Clear</button>
+        </div>
+        <div id="deepgram-result" class="test-result"></div>
       </div>
     </div>
 
-    <div class="card" id="admin-card" hidden>
+    <div class="card" id="admin-invites-card" hidden>
       <h2>Invites</h2>
-      <div class="hint">Generate a one-time invite link, then share it with the new user. Links expire in 7 days.</div>
-      <button class="primary" id="new-invite" style="padding:10px 16px;border-radius:9px;border:1px solid #6FE3A8;background:#6FE3A8;cursor:pointer;font-family:inherit;font-size:13px">New invite</button>
+      <div class="hint">Mint a one-time link and share it with the new user. Each link expires in 7 days and can only be used once.</div>
+      <button class="new-invite-btn" id="new-invite">+ New invite</button>
       <div class="invites" id="invite-list"></div>
+    </div>
+
+    <div class="card" id="admin-users-card" hidden>
+      <h2>Users</h2>
+      <div class="hint">All accounts on this gateway. You can delete a user (frees their unused invites) or toggle their admin flag. You can't delete or demote yourself, and you can't leave the system with zero admins.</div>
+      <div id="user-list"></div>
     </div>
 
     <div class="links">
@@ -97,6 +151,8 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
+    let me = null;
+
     const toast = (msg) => {
       const t = $('toast');
       t.textContent = msg;
@@ -108,22 +164,51 @@
       const res = await fetch('/auth/check');
       const data = await res.json();
       if (!data.authenticated) { window.location.href = '/'; return; }
-      $('me').innerHTML = `${data.user.email} ${data.user.isAdmin ? '<span style="color:#6FE3A8">· admin</span>' : ''}`;
-      setStatus('anthropic', data.keys?.anthropic);
-      setStatus('deepgram', data.keys?.deepgram);
+      me = data.user;
+      $('me').innerHTML = `${data.user.email}${data.user.isAdmin ? ' <span style="color:#6FE3A8">· admin</span>' : ''}`;
+      applyKeyState('anthropic', data.keys?.anthropic, data.effectiveKeys?.anthropic);
+      applyKeyState('deepgram', data.keys?.deepgram, data.effectiveKeys?.deepgram);
+      maybeShowSetup(data);
       if (data.user.isAdmin) {
-        $('admin-card').hidden = false;
+        $('admin-invites-card').hidden = false;
+        $('admin-users-card').hidden = false;
         loadInvites();
+        loadUsers();
       }
       if (new URLSearchParams(location.search).get('welcome')) {
-        toast('Welcome to Aside. Paste your API keys below.');
+        toast('Welcome to Aside. Add your keys below to start.');
       }
     }
 
-    function setStatus(slot, state) {
-      const el = $(`${slot}-status`);
-      el.textContent = state === 'set' ? 'set' : 'unset';
-      el.className = `pill ${state === 'set' ? 'set' : 'unset'}`;
+    function applyKeyState(slot, storedState, effectiveState) {
+      const pill = $(`${slot}-pill`);
+      if (storedState === 'set') {
+        pill.textContent = 'your key';
+        pill.className = 'pill set';
+      } else if (effectiveState === 'env') {
+        pill.textContent = 'using server default';
+        pill.className = 'pill env';
+      } else {
+        pill.textContent = 'not set';
+        pill.className = 'pill unset';
+      }
+    }
+
+    function maybeShowSetup(data) {
+      // Show the setup callout if the user has no usable Anthropic key
+      // (own or admin-env). Skip for admins whose env-key falls through.
+      const needsKey = data.effectiveKeys?.anthropic === 'none';
+      const callout = $('setup-callout');
+      callout.hidden = !needsKey;
+      if (needsKey) {
+        if (data.user.isAdmin) {
+          $('setup-title').textContent = 'You’re the admin. Set up your keys to get started.';
+          $('setup-body').textContent = 'Aside is talking to your own Anthropic and Deepgram accounts — paste your keys below. (If you set ANTHROPIC_API_KEY in the server’s .env, the admin account will fall back to that automatically.)';
+        } else {
+          $('setup-title').textContent = 'You’re almost there.';
+          $('setup-body').textContent = 'Aside uses your own API keys so you can see usage and bills in your own dashboards. Paste them below.';
+        }
+      }
     }
 
     async function saveKey(slot) {
@@ -134,21 +219,43 @@
         body: JSON.stringify({ [slot]: value }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); toast(d?.error || 'Save failed'); return; }
-      const data = await res.json();
-      setStatus(slot, data.keys?.[slot]);
       $(`${slot}-input`).value = '';
       toast(`${slot[0].toUpperCase() + slot.slice(1)} key saved.`);
+      loadMe(); // refresh pill + setup callout
     }
 
     async function clearKey(slot) {
       if (!confirm(`Clear the stored ${slot} key?`)) return;
-      const res = await fetch('/me/api-keys', {
+      await fetch('/me/api-keys', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [slot]: '' }),
       });
-      const data = await res.json();
-      setStatus(slot, data.keys?.[slot]);
       toast(`${slot[0].toUpperCase() + slot.slice(1)} key cleared.`);
+      loadMe();
+    }
+
+    async function testKey(slot) {
+      const resultEl = $(`${slot}-result`);
+      const candidate = $(`${slot}-input`).value.trim();
+      resultEl.className = 'test-result busy';
+      resultEl.textContent = candidate ? 'Testing the pasted key…' : 'Testing the stored key…';
+      try {
+        const res = await fetch('/me/api-keys/test', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(candidate ? { slot, candidate } : { slot }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data?.ok) {
+          resultEl.className = 'test-result ok';
+          resultEl.textContent = `✓ ${data.message || 'Authenticated.'}`;
+        } else {
+          resultEl.className = 'test-result err';
+          resultEl.textContent = `✗ ${data?.message || 'Test failed.'}`;
+        }
+      } catch (e) {
+        resultEl.className = 'test-result err';
+        resultEl.textContent = `✗ Network error.`;
+      }
     }
 
     async function loadInvites() {
@@ -168,25 +275,76 @@
         `;
         list.appendChild(row);
       }
-      list.addEventListener('click', async (e) => {
-        const btn = e.target.closest('button');
-        if (!btn) return;
-        const token = btn.dataset.token;
-        if (btn.dataset.action === 'copy') {
-          const url = `${location.origin}/signup?token=${token}`;
-          try { await navigator.clipboard.writeText(url); toast('Invite link copied'); } catch { toast('Copy failed'); }
-        } else if (btn.dataset.action === 'revoke') {
-          if (!confirm('Revoke this invite?')) return;
-          await fetch(`/admin/invites/${token}`, { method: 'DELETE' });
-          loadInvites();
-        }
-      }, { once: true });
     }
+
+    async function loadUsers() {
+      const res = await fetch('/admin/users');
+      if (!res.ok) return;
+      const { users } = await res.json();
+      const list = $('user-list');
+      list.innerHTML = '';
+      for (const u of users) {
+        const isYou = u.id === me?.id;
+        const row = document.createElement('div');
+        row.className = 'user-row';
+        row.innerHTML = `
+          <div class="who">
+            <div class="email">${escapeHtml(u.email)} ${isYou ? '<span class="badge you">you</span>' : ''} ${u.isAdmin && !isYou ? '<span class="badge">admin</span>' : ''}</div>
+            <div class="meta">${u.id.slice(0, 8)}… · joined ${new Date(u.createdAt).toLocaleDateString()}</div>
+          </div>
+          ${isYou ? '' : `
+            <button data-action="toggle-admin" data-id="${u.id}" data-make-admin="${!u.isAdmin}">
+              ${u.isAdmin ? 'Demote' : 'Make admin'}
+            </button>
+            <button class="danger" data-action="delete" data-id="${u.id}" data-email="${escapeHtml(u.email)}">Delete</button>
+          `}
+        `;
+        list.appendChild(row);
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Event delegation for invite + user actions
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const token = btn.dataset.token;
+      const id = btn.dataset.id;
+      if (action === 'copy') {
+        const url = `${location.origin}/signup?token=${token}`;
+        try { await navigator.clipboard.writeText(url); toast('Invite link copied'); } catch { toast('Copy failed'); }
+      } else if (action === 'revoke') {
+        if (!confirm('Revoke this invite?')) return;
+        await fetch(`/admin/invites/${token}`, { method: 'DELETE' });
+        loadInvites();
+      } else if (action === 'delete') {
+        if (!confirm(`Delete user ${btn.dataset.email}? This is not reversible.`)) return;
+        const r = await fetch(`/admin/users/${id}`, { method: 'DELETE' });
+        if (!r.ok) { const d = await r.json().catch(() => ({})); toast(d?.error || 'Delete failed'); return; }
+        toast('User deleted.');
+        loadUsers();
+      } else if (action === 'toggle-admin') {
+        const makeAdmin = btn.dataset.makeAdmin === 'true';
+        const r = await fetch(`/admin/users/${id}/admin`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isAdmin: makeAdmin }),
+        });
+        if (!r.ok) { const d = await r.json().catch(() => ({})); toast(d?.error || 'Update failed'); return; }
+        toast(makeAdmin ? 'Promoted to admin.' : 'Demoted.');
+        loadUsers();
+      }
+    });
 
     $('anthropic-save').onclick = () => saveKey('anthropic');
     $('anthropic-clear').onclick = () => clearKey('anthropic');
+    $('anthropic-test').onclick = () => testKey('anthropic');
     $('deepgram-save').onclick = () => saveKey('deepgram');
     $('deepgram-clear').onclick = () => clearKey('deepgram');
+    $('deepgram-test').onclick = () => testKey('deepgram');
     $('new-invite').onclick = async () => {
       const res = await fetch('/admin/invites', { method: 'POST' });
       const data = await res.json();

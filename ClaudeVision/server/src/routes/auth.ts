@@ -50,10 +50,34 @@ export function createAuthRouter(): Router {
       res.json({ authenticated: false });
       return;
     }
+    // Effective key resolution — matches the precedence used by /chat and
+    // /voice. Lets the client gate the Talk button accurately:
+    //   "own"  → user set their own key
+    //   "env"  → falling back to the operator's env-var key (admin only)
+    //   "none" → no key available; calls will 412
+    const status = getUserKeyStatus(user.id);
+    const envAnthropic = !!process.env.ANTHROPIC_API_KEY?.trim();
+    const envDeepgram = !!process.env.DEEPGRAM_API_KEY?.trim();
+    const effective = {
+      anthropic:
+        status.anthropic === "set"
+          ? "own"
+          : user.isAdmin && envAnthropic
+          ? "env"
+          : "none",
+      deepgram:
+        status.deepgram === "set"
+          ? "own"
+          : user.isAdmin && envDeepgram
+          ? "env"
+          : "none",
+    } as const;
     res.json({
       authenticated: true,
       user,
-      keys: getUserKeyStatus(user.id),
+      keys: status,
+      effectiveKeys: effective,
+      canChat: effective.anthropic !== "none",
     });
   });
 

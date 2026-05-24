@@ -8,12 +8,18 @@ const ALLOWED_VOICES = new Set([
 ]);
 const DEFAULT_VOICE = "aura-asteria-en";
 
-// Resolves the caller's Deepgram key. Logged-in users use their own;
-// otherwise we fall back to the env var (operator-managed shared use).
+// Resolves the caller's Deepgram key. Same precedence as /chat:
+// own key → admin env fallback → env (for non-session callers).
+// Non-admin users must BYO.
 function resolveDeepgramKey(req: Request): string | null {
   const userId = req.session?.userId;
   if (userId) {
-    return getUserApiKey(userId, "deepgram");
+    const own = getUserApiKey(userId, "deepgram");
+    if (own) return own;
+    if (req.session?.isAdmin) {
+      return process.env.DEEPGRAM_API_KEY?.trim() || null;
+    }
+    return null;
   }
   return process.env.DEEPGRAM_API_KEY?.trim() || null;
 }
