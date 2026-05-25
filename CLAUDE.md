@@ -33,8 +33,7 @@ ClaudeVision/
 - `npm start` — runs `node dist/index.js`
 - `npm run dev` — `tsx watch src/index.ts` (hot reload)
 - `./test/test-chat.sh [BASE_URL]` — smoke tests `/health`, `/tools`, `/chat`, `/config`, `/tools/health` via curl
-
-There is no unit test runner configured. "Tests" means the shell script above.
+- `npm test` — runs the Vitest suite (`test/*.test.ts`) covering crypto, users, middleware, and the atomic signup transaction. Each test file forks its own process and gets a fresh tmpdir SQLite DB via `test/setup.ts`, so adding a new test file is just dropping it in `test/` — no per-test isolation boilerplate needed.
 
 ### Channel server (`ClaudeVision/channel/`)
 - `bun install` then `bun server.ts` (or `npm start` which does both)
