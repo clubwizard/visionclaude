@@ -2,25 +2,48 @@ import express, { Router, type Request } from "express";
 import { getUserApiKey } from "../users.js";
 
 // Voice IDs are namespaced by provider:
-//   aura-…       → Deepgram Aura-1   (e.g. aura-asteria-en)
 //   aura-2-…     → Deepgram Aura-2   (e.g. aura-2-thalia-en)
 //   openai-…     → OpenAI gpt-4o-mini-tts (e.g. openai-alloy)
-const ALLOWED_DEEPGRAM_VOICES = new Set([
-  // Aura-1 (legacy — flatter delivery, lower latency)
-  "aura-asteria-en", "aura-luna-en", "aura-stella-en", "aura-athena-en", "aura-hera-en",
-  "aura-orion-en", "aura-arcas-en", "aura-perseus-en", "aura-angus-en",
-  "aura-orpheus-en", "aura-helios-en", "aura-zeus-en",
-  // Aura-2 (warmer, more expressive — same Deepgram key)
-  "aura-2-thalia-en", "aura-2-andromeda-en", "aura-2-helena-en", "aura-2-luna-en",
-  "aura-2-apollo-en", "aura-2-arcas-en", "aura-2-atlas-en", "aura-2-orion-en",
-  "aura-2-amalthea-en", "aura-2-aries-en",
-]);
+//
+// Aura-1 was removed — Aura-2 is the same Deepgram key but warmer and
+// more expressive, with no real downside. Keeping both made the picker
+// have ~22 Deepgram voices, half of which most users would never pick.
+// If we ever need ultra-low-latency back, add it as a separate "Fast"
+// optgroup rather than the full 12-voice legacy set.
+interface VoiceMeta {
+  id: string;
+  label: string;       // "Thalia · F · US"
+  provider: "deepgram" | "openai";
+}
 
-const ALLOWED_OPENAI_VOICES = new Set([
-  "openai-alloy", "openai-ash", "openai-ballad", "openai-coral",
-  "openai-echo", "openai-fable", "openai-nova", "openai-onyx",
-  "openai-sage", "openai-shimmer",
-]);
+const DEEPGRAM_VOICES: VoiceMeta[] = [
+  { id: "aura-2-thalia-en",     label: "Thalia · F · US",     provider: "deepgram" },
+  { id: "aura-2-andromeda-en",  label: "Andromeda · F · US",  provider: "deepgram" },
+  { id: "aura-2-helena-en",     label: "Helena · F · US",     provider: "deepgram" },
+  { id: "aura-2-luna-en",       label: "Luna · F · US",       provider: "deepgram" },
+  { id: "aura-2-amalthea-en",   label: "Amalthea · F · US",   provider: "deepgram" },
+  { id: "aura-2-apollo-en",     label: "Apollo · M · US",     provider: "deepgram" },
+  { id: "aura-2-arcas-en",      label: "Arcas · M · US",      provider: "deepgram" },
+  { id: "aura-2-atlas-en",      label: "Atlas · M · US",      provider: "deepgram" },
+  { id: "aura-2-orion-en",      label: "Orion · M · US",      provider: "deepgram" },
+  { id: "aura-2-aries-en",      label: "Aries · M · US",      provider: "deepgram" },
+];
+
+const OPENAI_VOICES: VoiceMeta[] = [
+  { id: "openai-alloy",   label: "Alloy · neutral",       provider: "openai" },
+  { id: "openai-ash",     label: "Ash · warm",            provider: "openai" },
+  { id: "openai-ballad",  label: "Ballad · lyrical",      provider: "openai" },
+  { id: "openai-coral",   label: "Coral · warm F",        provider: "openai" },
+  { id: "openai-echo",    label: "Echo · warm M",         provider: "openai" },
+  { id: "openai-fable",   label: "Fable · British",       provider: "openai" },
+  { id: "openai-nova",    label: "Nova · energetic F",    provider: "openai" },
+  { id: "openai-onyx",    label: "Onyx · deep M",         provider: "openai" },
+  { id: "openai-sage",    label: "Sage · calm",           provider: "openai" },
+  { id: "openai-shimmer", label: "Shimmer · warm F",      provider: "openai" },
+];
+
+const ALLOWED_DEEPGRAM_VOICES = new Set(DEEPGRAM_VOICES.map(v => v.id));
+const ALLOWED_OPENAI_VOICES = new Set(OPENAI_VOICES.map(v => v.id));
 
 const DEFAULT_VOICE = "aura-2-thalia-en";
 
@@ -50,6 +73,52 @@ function resolveProviderKey(
 
 export function createVoiceRouter() {
   const router = Router();
+
+  // GET /voice/list — returns the voices the *currently authenticated user*
+  // can actually use, grouped by provider. Hides any provider the user has
+  // no working key for (own key OR — for admins — the env fallback). This
+  // is what the web client paints into the dropdown; hardcoding the full
+  // list client-side meant users saw 30+ options, most of which 503'd at
+  // click time.
+  router.get("/list", (req, res) => {
+    const groups: Array<{
+      provider: "deepgram" | "openai";
+      label: string;
+      voices: Array<{ id: string; label: string }>;
+    }> = [];
+
+    const hasDeepgram = !!resolveProviderKey(req, "deepgram", "DEEPGRAM_API_KEY");
+    const hasOpenAI = !!resolveProviderKey(req, "openai", "OPENAI_API_KEY");
+
+    if (hasDeepgram) {
+      groups.push({
+        provider: "deepgram",
+        label: "Deepgram Aura-2",
+        voices: DEEPGRAM_VOICES.map(v => ({ id: v.id, label: v.label })),
+      });
+    }
+    if (hasOpenAI) {
+      groups.push({
+        provider: "openai",
+        label: "OpenAI",
+        voices: OPENAI_VOICES.map(v => ({ id: v.id, label: v.label })),
+      });
+    }
+
+    // Default voice: prefer Aura-2 (low-latency + warm), fall back to
+    // OpenAI Alloy if only OpenAI is available, null if nothing is set.
+    let defaultVoice: string | null = null;
+    if (hasDeepgram) defaultVoice = DEFAULT_VOICE;
+    else if (hasOpenAI) defaultVoice = "openai-alloy";
+
+    res.json({
+      groups,
+      default: defaultVoice,
+      // Surface this so the client can show a "Configure a TTS key" hint
+      // instead of an empty dropdown.
+      configured: hasDeepgram || hasOpenAI,
+    });
+  });
 
   router.post("/speak", async (req, res) => {
     const { text, voice } = req.body as { text?: string; voice?: string };
