@@ -21,6 +21,7 @@ import { createAdminRouter } from "./routes/admin.js";
 import { getDb, closeDb } from "./db.js";
 import { countUsers, createUser, findUserByEmail } from "./users.js";
 import { suggestMasterKey } from "./crypto.js";
+import { detectFamily, isLatestInFamily, getSuccessor } from "./model-registry.js";
 import type { ServerConfig } from "./types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -123,11 +124,33 @@ async function main() {
 
   const systemPrompt = DEFAULT_SYSTEM_PROMPT + skillLoader.buildSystemPromptSection();
 
+  const configuredModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
   const config: ServerConfig = {
     systemPrompt,
-    model: process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514",
+    model: configuredModel,
     maxTokens: 4096,
   };
+  // Surface stale-model hints at boot. Doesn't fail startup — even a stale
+  // model usually still works for a while after a fresher one ships.
+  // If/when it gets retired, ClaudeClient.callWithDeprecationRetry recovers
+  // automatically. This banner just nudges the operator to update .env.
+  if (detectFamily(configuredModel) && !isLatestInFamily(configuredModel)) {
+    const latest = getSuccessor(configuredModel);
+    console.log(
+      c.warn(
+        `[Model] CLAUDE_MODEL="${configuredModel}" is not the latest in its family. ` +
+          `Latest known: "${latest}". When Anthropic retires the configured model, ` +
+          `the server will auto-fall-back to the latest — but you should update .env at some point.`
+      )
+    );
+  } else if (!detectFamily(configuredModel)) {
+    console.log(
+      c.warn(
+        `[Model] CLAUDE_MODEL="${configuredModel}" doesn't match any known family (sonnet/opus/haiku). ` +
+          `Auto-fallback on deprecation will use the default Sonnet — verify this is what you want.`
+      )
+    );
+  }
 
   const claudeClient = new ClaudeClient(mcpManager, config);
   const conversations = new ConversationStore();
