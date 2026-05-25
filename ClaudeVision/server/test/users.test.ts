@@ -138,6 +138,33 @@ describe("signupWithInvite — atomicity", () => {
     const r2 = signupWithInvite(token, "fresh@x.com", "longenough");
     expect(r2.ok).toBe(true);
   });
+
+  it("SECURITY: invalid token + existing email returns invalid_invite (no enumeration)", () => {
+    // Without the pre-check, the UNIQUE constraint on users.email fires
+    // first and returns email_taken — letting an unauthenticated caller
+    // probe which emails are registered using any junk token. We require
+    // invalid_invite as the response in this case.
+    createUser({ email: "registered@x.com", password: "longenough" });
+    const r = signupWithInvite("junk-token", "registered@x.com", "longenough");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("invalid_invite");
+  });
+
+  it("SECURITY: invalid token + brand-new email also returns invalid_invite (parity)", () => {
+    const r = signupWithInvite("junk-token", "brand-new@x.com", "longenough");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("invalid_invite");
+  });
+
+  it("expired token returns invalid_invite even with valid email", () => {
+    const admin = createUser({ email: "admin@x.com", password: "longenough", isAdmin: true });
+    const token = newInvite(admin.id);
+    // Force expiry
+    getDb().prepare("UPDATE invites SET expires_at = ? WHERE token = ?").run(1, token);
+    const r = signupWithInvite(token, "new@x.com", "longenough");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("invalid_invite");
+  });
 });
 
 describe("incrementUsage", () => {

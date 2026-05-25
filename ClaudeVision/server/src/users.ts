@@ -326,6 +326,10 @@ export function signupWithInvite(
   const normalizedEmail = email.toLowerCase();
   const passwordHash = hashPassword(password);
 
+  const checkInvite = db.prepare(
+    `SELECT 1 AS ok FROM invites
+     WHERE token = ? AND used_by IS NULL AND expires_at > ?`
+  );
   const claimInvite = db.prepare(
     `UPDATE invites
      SET used_by = ?, used_at = ?
@@ -336,19 +340,28 @@ export function signupWithInvite(
      VALUES (?, ?, ?, 0, ?)`
   );
 
+  function invalidInvite(): Error {
+    const e = new Error("INVALID_INVITE");
+    (e as Error & { code?: string }).code = "INVALID_INVITE";
+    return e;
+  }
+
+  // SECURITY: pre-check invite validity BEFORE inserting the user so an
+  // invalid token returns INVALID_INVITE regardless of whether the email
+  // is already registered. Otherwise an unauthenticated caller could
+  // probe registered emails by attempting signup with a junk token plus
+  // a target email — the UNIQUE constraint on users.email would fire
+  // first and return email_taken, leaking which addresses exist.
+  //
+  // The claim itself (UPDATE WHERE used_by IS NULL) is still what closes
+  // the race: two concurrent signups can both pass the pre-check, both
+  // INSERT, but only one's UPDATE returns changes=1. The other throws
+  // and the transaction rolls back, removing the orphan user row.
   const run = db.transaction(() => {
-    // INSERT user first so invites.used_by FK is satisfied. Two concurrent
-    // signups racing on the same token both INSERT, but only one wins the
-    // claimInvite UPDATE (changes=1 — the other gets changes=0, throws,
-    // and the entire transaction rolls back — user row included).
+    if (!checkInvite.get(token, now)) throw invalidInvite();
     insertUser.run(userId, normalizedEmail, passwordHash, now);
     const r = claimInvite.run(userId, now, token, now);
-    if (r.changes === 0) {
-      // Sentinel — caught below and translated to a structured result.
-      const e = new Error("INVALID_INVITE");
-      (e as Error & { code?: string }).code = "INVALID_INVITE";
-      throw e;
-    }
+    if (r.changes === 0) throw invalidInvite(); // lost the race
   });
 
   try {
