@@ -30,14 +30,16 @@
 
 ---
 
-**VisionClaude** turns your iPhone or Meta Ray-Ban Smart Glasses into Claude's eyes and ears. Your phone connects directly to your Claude Code session — speak naturally, and Claude sees what you see, responds with voice, and uses ALL your MCP tools and skills.
+**VisionClaude** turns your iPhone or Meta Ray-Ban Smart Glasses into Claude's eyes and ears. Your phone connects directly to your Claude Code or Claude Desktop / Cowork session — speak naturally, and Claude sees what you see, responds with voice, and uses ALL your MCP tools and skills.
 
 ```
-iPhone/Glasses  ──→  Channel Plugin  ──→  Claude Code (Opus)
+iPhone/Glasses  ──→  Channel Plugin  ──→  Claude Code OR Cowork
   (camera+voice)     (WebSocket)          ALL your MCP tools
                                           ALL your skills
                                           Full Cowork session
 ```
+
+> 📖 **First time here?** Read the [Help Guide](ClaudeVision/docs/HELP.md) — it covers what VisionClaude is, the three ways to use it, full setup walkthroughs, settings reference, troubleshooting, and a glossary of all the moving parts.
 
 ## Quick Start (5 minutes)
 
