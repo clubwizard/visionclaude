@@ -105,6 +105,37 @@
     .mcp-info-detail { font-size: 12px; color: #7B7468; line-height: 1.45; word-break: break-word; }
     .mcp-info-config { font-size: 11px; color: #7B7468; padding: 10px 12px; background: #FAF6EC; border-radius: 8px; word-break: break-all; }
     .mcp-info-config code { font-family: ui-monospace, monospace; color: #4A4540; }
+    .user-mcp-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 14px;
+      background: #FAF6EC;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .user-mcp-row .who { flex: 1 1 200px; min-width: 0; }
+    .user-mcp-row .name { font-weight: 500; font-size: 14px; color: #1A1714; word-break: break-word; }
+    .user-mcp-row .url { font-family: ui-monospace, monospace; font-size: 11px; color: #7B7468; margin-top: 2px; word-break: break-all; }
+    .user-mcp-row .meta { font-size: 11px; color: #7B7468; margin-top: 4px; }
+    .user-mcp-row .meta .pill { margin-right: 6px; }
+    .user-mcp-row .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .user-mcp-row button { padding: 6px 12px; border: 1px solid #D9D1C0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .user-mcp-row button.danger { color: #C25A2B; border-color: #E89A6B; }
+    .user-mcp-row button.test { color: #3B5BBF; border-color: #C7D2EE; }
+    .user-mcp-row .test-msg { flex: 1 1 100%; font-size: 12px; padding-left: 2px; }
+    .user-mcp-row .test-msg.ok { color: #2F8A57; }
+    .user-mcp-row .test-msg.err { color: #C25A2B; }
+    .user-mcp-row .test-msg.busy { color: #7B7468; }
+    .user-mcp-empty { padding: 14px 16px; background: #FAF6EC; border-radius: 10px; font-size: 13px; color: #7B7468; font-style: italic; }
+    .user-mcp-form { margin-top: 14px; padding: 16px; background: #FAF6EC; border-radius: 10px; }
+    .user-mcp-form label { margin-top: 10px; }
+    .user-mcp-form label:first-child { margin-top: 0; }
+    .user-mcp-form input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #D9D1C0; background: #FFFDF8; font-size: 14px; font-family: inherit; margin-top: 4px; }
+    .user-mcp-form input:focus { outline: 2px solid #6FE3A8; outline-offset: 1px; }
+    .user-mcp-form-actions { margin-top: 14px; display: flex; gap: 8px; }
+    .user-mcp-form button { padding: 10px 16px; border-radius: 8px; border: 1px solid #6FE3A8; background: #6FE3A8; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
     .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1A1714; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity 0.2s; }
     .toast.show { opacity: 1; }
     .links { font-size: 13px; color: #7B7468; }
@@ -172,11 +203,49 @@
       </div>
     </div>
 
-    <div class="card" id="mcp-info-card">
-      <h2>Cowork & MCP</h2>
+    <div class="card" id="user-mcp-card">
+      <h2>Your MCP connectors</h2>
       <div class="hint">
-        VisionClaude's Channel server registers as an MCP server so Claude Desktop's <strong>Cowork</strong> mode (and Claude Code) can pull camera snapshots and voice replies from your phone mid-task.
-        <a href="https://github.com/clubwizard/visionclaude/blob/main/ClaudeVision/docs/CLAUDE_DESKTOP_SETUP.md" target="_blank" rel="noopener">Set up Claude Desktop &rarr;</a>
+        Hook Aside into <strong>your own</strong> tools (Slack, Notion, GitHub, custom services…) by adding remote MCP servers below. They're scoped to your account &mdash; other users only see the operator's shared tools, never yours.
+        <details style="margin-top:8px">
+          <summary style="cursor:pointer;color:#1A1714">How does this work?</summary>
+          <div style="margin-top:8px;line-height:1.6">
+            An MCP server is a hosted endpoint that exposes tools (send_message, search_repos, etc.) over HTTP. Aside connects to yours with the auth token you provide here, and the tools become available to Claude on your next chat. Aura, Notion, Anthropic Connectors, and self-hosted servers all work the same way &mdash; just paste the URL.
+            <ul style="margin:8px 0 0 18px">
+              <li><strong>URL</strong> &mdash; the server's full HTTPS endpoint (e.g. <code>https://mcp.example.com/sse</code>). Plain HTTP and private IPs are blocked.</li>
+              <li><strong>Auth header</strong> &mdash; usually <code>Bearer your-token</code>. Encrypted at rest with the server's master key.</li>
+              <li>Connections are opened on demand and dropped after 10 minutes idle, so this stays light on the host.</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+
+      <div id="user-mcp-list"></div>
+
+      <details id="user-mcp-add" style="margin-top:16px">
+        <summary style="cursor:pointer;font-weight:500;font-size:14px;color:#1A1714">+ Add a connector</summary>
+        <div class="user-mcp-form">
+          <label for="user-mcp-name">Name</label>
+          <input id="user-mcp-name" type="text" placeholder="My Notion workspace" maxlength="64" />
+
+          <label for="user-mcp-url">URL (https://)</label>
+          <input id="user-mcp-url" type="url" placeholder="https://mcp.example.com/sse" autocomplete="off" />
+
+          <label for="user-mcp-auth">Auth header (optional)</label>
+          <input id="user-mcp-auth" type="password" placeholder="Bearer ..." autocomplete="off" />
+
+          <div id="user-mcp-err" class="test-result err" hidden></div>
+          <div class="user-mcp-form-actions">
+            <button class="primary" id="user-mcp-save">Save connector</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="card" id="mcp-info-card">
+      <h2>Shared tools</h2>
+      <div class="hint">
+        Tools the operator has configured on the server, available to every account. Set the <code>MCP_CONFIG_PATH</code> environment variable on the host to point at a different config, or leave it unset to use the default Claude Desktop location.
       </div>
       <div id="mcp-info-body" class="mcp-info-grid">
         <div class="mcp-info-cell">
@@ -254,10 +323,11 @@
         loadInvites();
         loadUsers();
       }
-      // Fire-and-forget — the MCP card is informational and doesn't gate
-      // any other interaction. If the endpoint errors we just leave the
-      // placeholder dashes in place.
+      // Fire-and-forget — the cards are informational and don't gate
+      // any other interaction. If an endpoint errors we just leave the
+      // placeholder content in place.
       loadMcpInfo();
+      loadUserMcpServers();
       if (new URLSearchParams(location.search).get('welcome')) {
         toast('Welcome to Aside. Add your keys below to start.');
       }
@@ -358,6 +428,168 @@
                               <button data-token="${safeToken}" data-action="revoke">Revoke</button>`}
         `;
         list.appendChild(row);
+      }
+    }
+
+    async function loadUserMcpServers() {
+      try {
+        const res = await fetch('/me/mcp-servers');
+        if (!res.ok) return;
+        const { servers } = await res.json();
+        const list = $('user-mcp-list');
+        list.textContent = '';
+        if (!servers?.length) {
+          const empty = document.createElement('div');
+          empty.className = 'user-mcp-empty';
+          empty.textContent = "No connectors yet. Use the form below to add your first one.";
+          list.appendChild(empty);
+          return;
+        }
+        for (const s of servers) {
+          list.appendChild(renderUserMcpRow(s));
+        }
+      } catch {
+        // Non-fatal — leave list empty
+      }
+    }
+
+    function renderUserMcpRow(s) {
+      // Build every text node via textContent so a maliciously-named
+      // server (or auth-injected name) can't smuggle markup.
+      const row = document.createElement('div');
+      row.className = 'user-mcp-row';
+      row.dataset.id = s.id;
+
+      const who = document.createElement('div');
+      who.className = 'who';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'name';
+      nameEl.textContent = s.name;
+      const urlEl = document.createElement('div');
+      urlEl.className = 'url';
+      urlEl.textContent = s.url;
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const statePill = document.createElement('span');
+      statePill.className = 'pill ' + (s.enabled ? 'set' : 'unset');
+      statePill.textContent = s.enabled ? 'enabled' : 'disabled';
+      meta.appendChild(statePill);
+      if (s.hasAuth) {
+        const authPill = document.createElement('span');
+        authPill.className = 'pill env';
+        authPill.textContent = 'auth set';
+        meta.appendChild(authPill);
+      }
+      who.appendChild(nameEl);
+      who.appendChild(urlEl);
+      who.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      const testBtn = document.createElement('button');
+      testBtn.className = 'test';
+      testBtn.textContent = 'Test';
+      testBtn.onclick = () => testUserMcpServer(s.id, row);
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.textContent = s.enabled ? 'Disable' : 'Enable';
+      toggleBtn.onclick = () => toggleUserMcpServer(s.id, !s.enabled);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'danger';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.onclick = () => deleteUserMcpServer(s.id, s.name);
+
+      actions.appendChild(testBtn);
+      actions.appendChild(toggleBtn);
+      actions.appendChild(deleteBtn);
+
+      const msg = document.createElement('div');
+      msg.className = 'test-msg';
+      msg.dataset.role = 'msg';
+
+      row.appendChild(who);
+      row.appendChild(actions);
+      row.appendChild(msg);
+      return row;
+    }
+
+    async function testUserMcpServer(id, rowEl) {
+      const msg = rowEl.querySelector('[data-role="msg"]');
+      msg.className = 'test-msg busy';
+      msg.textContent = 'Connecting…';
+      try {
+        const res = await fetch(`/me/mcp-servers/${id}/test`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          msg.className = 'test-msg ok';
+          const toolCount = data.toolCount ?? 0;
+          msg.textContent = `Connected. ${toolCount} tool${toolCount === 1 ? '' : 's'} available.`;
+        } else {
+          msg.className = 'test-msg err';
+          msg.textContent = data?.error || 'Connection failed.';
+        }
+      } catch {
+        msg.className = 'test-msg err';
+        msg.textContent = 'Network error.';
+      }
+    }
+
+    async function toggleUserMcpServer(id, enabled) {
+      try {
+        await fetch(`/me/mcp-servers/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+      } finally {
+        loadUserMcpServers();
+      }
+    }
+
+    async function deleteUserMcpServer(id, name) {
+      if (!confirm(`Delete the MCP connector "${name}"? This can't be undone.`)) return;
+      try {
+        await fetch(`/me/mcp-servers/${id}`, { method: 'DELETE' });
+      } finally {
+        loadUserMcpServers();
+      }
+    }
+
+    async function saveNewUserMcpServer() {
+      const errEl = $('user-mcp-err');
+      errEl.hidden = true;
+      const name = $('user-mcp-name').value.trim();
+      const url = $('user-mcp-url').value.trim();
+      const authHeader = $('user-mcp-auth').value.trim();
+      if (!name || !url) {
+        errEl.textContent = 'Name and URL are required.';
+        errEl.hidden = false;
+        return;
+      }
+      try {
+        const res = await fetch('/me/mcp-servers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, url, authHeader: authHeader || null }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          errEl.textContent = data?.error || `Save failed (HTTP ${res.status}).`;
+          errEl.hidden = false;
+          return;
+        }
+        // Clear the form, close the disclosure, reload the list
+        $('user-mcp-name').value = '';
+        $('user-mcp-url').value = '';
+        $('user-mcp-auth').value = '';
+        $('user-mcp-add').open = false;
+        toast(`Saved "${name}". Tap Test to verify it connects.`);
+        loadUserMcpServers();
+      } catch (err) {
+        errEl.textContent = 'Network error. Try again.';
+        errEl.hidden = false;
       }
     }
 
@@ -517,6 +749,7 @@
     $('openai-save').onclick = () => saveKey('openai');
     $('openai-clear').onclick = () => clearKey('openai');
     $('openai-test').onclick = () => testKey('openai');
+    $('user-mcp-save').onclick = (e) => { e.preventDefault?.(); saveNewUserMcpServer(); };
     $('new-invite').onclick = async (e) => {
       const btn = e.currentTarget;
       const res = await fetch('/admin/invites', { method: 'POST' });

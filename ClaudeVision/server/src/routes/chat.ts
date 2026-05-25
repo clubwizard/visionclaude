@@ -88,8 +88,11 @@ export function createChatRouter(
         historyImageBudget
       );
 
+      // Thread the userId through so the user's per-user remote MCP
+      // servers are merged into the available tool set. Gateway-key
+      // callers (no session) get only the shared operator tools.
       const chatFn = () =>
-        claudeClient.chat(messages, body.text || "", body.images, anthropicKey);
+        claudeClient.chat(messages, body.text || "", body.images, anthropicKey, userId ?? undefined);
 
       const { responseText, toolCalls, inputTokens, outputTokens } = requestQueue
         ? await requestQueue.enqueue(chatFn)

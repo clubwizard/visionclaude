@@ -77,6 +77,29 @@ function runMigrations(db: Database.Database): void {
       ON password_resets(user_id);
     CREATE INDEX IF NOT EXISTS idx_password_resets_expires_at
       ON password_resets(expires_at);
+
+    -- Per-user remote MCP servers. Each row is one HTTP/SSE MCP endpoint
+    -- the user has configured, with the auth header encrypted at rest
+    -- (same envelope as users.api_key_*_enc). The Gateway opens
+    -- per-user connections lazily on the first /chat that needs them,
+    -- caches with LRU eviction, and merges the user's tools with the
+    -- operator's shared tool set on a per-request basis.
+    --
+    -- Stdio MCP (command:) is intentionally NOT supported here — per-
+    -- user processes don't scale on a shared host. Operators add stdio
+    -- servers to claude_desktop_config.json and they're shared.
+    CREATE TABLE IF NOT EXISTS user_mcp_servers (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      url TEXT NOT NULL,
+      auth_header_enc TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL,
+      last_used_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_mcp_servers_user_id
+      ON user_mcp_servers(user_id);
   `);
 
   // Incremental columns — SQLite has no IF NOT EXISTS for ADD COLUMN, so

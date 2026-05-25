@@ -97,7 +97,13 @@ export class ClaudeClient {
     history: MessageParam[],
     text: string,
     images: string[] | undefined,
-    apiKey: string
+    apiKey: string,
+    // Optional — when present, the per-user MCP pool is consulted in
+    // addition to the operator's shared tools, and tool_use blocks are
+    // routed through invokeToolForUser so user-namespaced tools dispatch
+    // to the right per-user connection. Gateway-key callers (no session)
+    // omit this and only see the shared operator tools.
+    userId?: string
   ): Promise<{
     responseText: string;
     toolCalls: ToolCallResult[];
@@ -132,8 +138,15 @@ export class ClaudeClient {
     const userMessage: MessageParam = { role: "user", content };
     const messages = [...history, userMessage];
 
-    // Get tools from MCP
-    const tools = this.mcpManager.getToolsForClaude();
+    // Get tools from MCP — when we have a user identity, merge their
+    // per-user remote MCP tools (namespaced) with the operator's shared
+    // tools. The merge can throw if any individual user-server fails to
+    // connect, but the implementation swallows those errors and just
+    // skips the broken server so a single bad config doesn't tank the
+    // entire chat call.
+    const tools = userId
+      ? await this.mcpManager.getToolsForChatForUser(userId)
+      : this.mcpManager.getToolsForClaude();
 
     // Tool use loop
     const allToolCalls: ToolCallResult[] = [];
@@ -182,10 +195,19 @@ export class ClaudeClient {
       for (const toolUse of toolUseBlocks) {
         console.log(`[Claude] Tool call: ${toolUse.name}`);
         try {
-          const result = await this.mcpManager.invokeTool(
-            toolUse.name,
-            toolUse.input as Record<string, unknown>
-          );
+          // Route through the user-aware variant when we have an identity;
+          // it falls back to operator-shared if the tool name isn't in
+          // the user pool, so it's safe to use universally.
+          const result = userId
+            ? await this.mcpManager.invokeToolForUser(
+                userId,
+                toolUse.name,
+                toolUse.input as Record<string, unknown>
+              )
+            : await this.mcpManager.invokeTool(
+                toolUse.name,
+                toolUse.input as Record<string, unknown>
+              );
           allToolCalls.push({ name: toolUse.name, result });
           toolResults.push({
             type: "tool_result",
