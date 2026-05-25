@@ -67,6 +67,7 @@
     .user-row .who { flex: 1; }
     .user-row .who .email { font-weight: 500; }
     .user-row .who .meta { color: #7B7468; font-size: 11px; font-family: ui-monospace, monospace; margin-top: 2px; }
+    .user-row .who .meta.usage { color: #4A4540; }
     .user-row button { padding: 6px 12px; border: 1px solid #D9D1C0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; }
     .user-row button.danger { color: #C25A2B; border-color: #E89A6B; }
     .user-row .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #DDF7E5; color: #2F8A57; font-family: ui-monospace, monospace; }
@@ -308,10 +309,14 @@
         const isYou = u.id === me?.id;
         const row = document.createElement('div');
         row.className = 'user-row';
+        const usage = (u.requestCount ?? 0) > 0
+          ? `${u.requestCount} req · ${formatTokens(u.inputTokens)} in / ${formatTokens(u.outputTokens)} out${u.lastUsedAt ? ` · last ${relTime(u.lastUsedAt)}` : ''}`
+          : 'no chats yet';
         row.innerHTML = `
           <div class="who">
             <div class="email">${escapeHtml(u.email)} ${isYou ? '<span class="badge you">you</span>' : ''} ${u.isAdmin && !isYou ? '<span class="badge">admin</span>' : ''}</div>
             <div class="meta">${u.id.slice(0, 8)}… · joined ${new Date(u.createdAt).toLocaleDateString()}</div>
+            <div class="meta usage">${usage}</div>
           </div>
           ${isYou ? '' : `
             <button data-action="toggle-admin" data-id="${u.id}" data-make-admin="${!u.isAdmin}">
@@ -324,8 +329,38 @@
       }
     }
 
+    function formatTokens(n) {
+      const v = Number(n) || 0;
+      if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'M';
+      if (v >= 1_000) return (v / 1_000).toFixed(1) + 'k';
+      return String(v);
+    }
+
+    function relTime(ts) {
+      const diff = Date.now() - Number(ts);
+      if (diff < 60_000) return 'just now';
+      const min = Math.floor(diff / 60_000);
+      if (min < 60) return `${min}m ago`;
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return `${hr}h ago`;
+      const d = Math.floor(hr / 24);
+      return `${d}d ago`;
+    }
+
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Briefly swap a button's label to a success state, then revert.
+    function flashCopied(btn, label = '✓ Copied') {
+      if (!btn) return;
+      const orig = btn.textContent;
+      btn.textContent = label;
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.disabled = false;
+      }, 1400);
     }
 
     // Event delegation for invite + user actions
@@ -337,7 +372,13 @@
       const id = btn.dataset.id;
       if (action === 'copy') {
         const url = `${location.origin}/signup?token=${token}`;
-        try { await navigator.clipboard.writeText(url); toast('Invite link copied'); } catch { toast('Copy failed'); }
+        try {
+          await navigator.clipboard.writeText(url);
+          flashCopied(btn);
+          toast('Invite link copied');
+        } catch {
+          toast('Copy failed — select the URL and copy manually');
+        }
       } else if (action === 'revoke') {
         if (!confirm('Revoke this invite?')) return;
         await fetch(`/admin/invites/${token}`, { method: 'DELETE' });
@@ -369,11 +410,17 @@
     $('openai-save').onclick = () => saveKey('openai');
     $('openai-clear').onclick = () => clearKey('openai');
     $('openai-test').onclick = () => testKey('openai');
-    $('new-invite').onclick = async () => {
+    $('new-invite').onclick = async (e) => {
+      const btn = e.currentTarget;
       const res = await fetch('/admin/invites', { method: 'POST' });
       const data = await res.json();
       const url = `${location.origin}${data.signupUrl}`;
-      try { await navigator.clipboard.writeText(url); toast('Invite link copied to clipboard'); } catch { toast('Invite created — see list below'); }
+      try {
+        await navigator.clipboard.writeText(url);
+        flashCopied(btn, '✓ Invite link copied');
+      } catch {
+        toast('Invite created — see list below to copy');
+      }
       loadInvites();
     };
     $('logout').onclick = async () => {

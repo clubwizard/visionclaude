@@ -125,6 +125,19 @@
       padding: 4px 8px;
       cursor: pointer;
     }
+    #voice-preview {
+      font-family: 'Inter Tight', sans-serif;
+      font-size: 12px;
+      color: #4A4540;
+      background: #FFFDF8;
+      border: 1px solid #D9D1C0;
+      border-radius: 8px;
+      padding: 4px 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    #voice-preview:disabled { opacity: 0.55; cursor: default; }
+    #voice-preview.playing { background: #FFE9D6; border-color: #C25A2B; color: #C25A2B; }
     #vision-status {
       font-family: ui-monospace, monospace;
       font-size: 12px;
@@ -375,6 +388,7 @@
         <option value="aura-zeus-en">Zeus · M · US</option>
       </optgroup>
     </select>
+    <button type="button" id="voice-preview" title="Play a short sample with this voice">▶ Preview</button>
   </div>
   <canvas id="snap" hidden></canvas>
   <div id="status">Ready</div>
@@ -421,6 +435,57 @@
       localStorage.setItem(VOICE_KEY, voiceSelect.value);
     });
     function selectedVoice() { return voiceSelect.value || DEFAULT_VOICE; }
+
+    // Voice preview — plays a short sample with the selected voice so the
+    // user can audition without launching a full chat. Independent of the
+    // Talk pipeline; clicking again while playing stops the preview.
+    const voicePreviewBtn = document.getElementById('voice-preview');
+    const PREVIEW_TEXT = "Hi, this is what I sound like.";
+    let previewSource = null;
+    voicePreviewBtn.onclick = async () => {
+      if (previewSource) {
+        try { previewSource.onended = null; previewSource.stop(); } catch {}
+        previewSource = null;
+        voicePreviewBtn.classList.remove('playing');
+        voicePreviewBtn.textContent = '▶ Preview';
+        return;
+      }
+      voicePreviewBtn.classList.add('playing');
+      voicePreviewBtn.textContent = '■ Stop';
+      try {
+        const res = await fetch('/voice/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: PREVIEW_TEXT, voice: selectedVoice() }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          alert(data?.error || `Preview failed (HTTP ${res.status})`);
+          return;
+        }
+        const buf = await res.arrayBuffer();
+        const ctx = getAudioContext();
+        const decoded = await new Promise((resolve, reject) => {
+          try { ctx.decodeAudioData(buf, resolve, reject); } catch (e) { reject(e); }
+        });
+        await new Promise((resolve) => {
+          const src = ctx.createBufferSource();
+          previewSource = src;
+          src.buffer = decoded;
+          src.connect(ctx.destination);
+          src.onended = () => {
+            if (previewSource === src) previewSource = null;
+            resolve();
+          };
+          src.start();
+        });
+      } catch (e) {
+        if (e?.name !== 'AbortError') console.warn('[preview] failed', e);
+      } finally {
+        voicePreviewBtn.classList.remove('playing');
+        voicePreviewBtn.textContent = '▶ Preview';
+      }
+    };
 
     function setVisionStatus(text, kind /* 'ok' | 'err' | '' */) {
       visionStatus.textContent = text;

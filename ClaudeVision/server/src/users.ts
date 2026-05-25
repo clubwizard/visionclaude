@@ -21,6 +21,10 @@ export interface User {
   email: string;
   isAdmin: boolean;
   createdAt: number;
+  requestCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  lastUsedAt: number | null;
 }
 
 interface UserRow {
@@ -31,6 +35,10 @@ interface UserRow {
   created_at: number;
   api_key_anthropic_enc: string | null;
   api_key_deepgram_enc: string | null;
+  request_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  last_used_at: number | null;
 }
 
 interface InviteRow {
@@ -48,7 +56,33 @@ function rowToUser(row: UserRow): User {
     email: row.email,
     isAdmin: row.is_admin === 1,
     createdAt: row.created_at,
+    requestCount: row.request_count ?? 0,
+    inputTokens: row.input_tokens ?? 0,
+    outputTokens: row.output_tokens ?? 0,
+    lastUsedAt: row.last_used_at,
   };
+}
+
+// Atomic counter bump per chat response. Best-effort — never throws into
+// the request path; usage is observable, not authoritative.
+export function incrementUsage(
+  userId: string,
+  inputTokens: number,
+  outputTokens: number
+): void {
+  try {
+    const db = getDb();
+    db.prepare(
+      `UPDATE users
+         SET request_count = request_count + 1,
+             input_tokens = input_tokens + ?,
+             output_tokens = output_tokens + ?,
+             last_used_at = ?
+       WHERE id = ?`
+    ).run(inputTokens, outputTokens, Date.now(), userId);
+  } catch {
+    // swallow — usage tracking must not break /chat
+  }
 }
 
 // ── User CRUD ──
@@ -135,7 +169,16 @@ export function createUser(input: CreateUserInput): User {
     input.isAdmin ? 1 : 0,
     now
   );
-  return { id, email: input.email.toLowerCase(), isAdmin: !!input.isAdmin, createdAt: now };
+  return {
+    id,
+    email: input.email.toLowerCase(),
+    isAdmin: !!input.isAdmin,
+    createdAt: now,
+    requestCount: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    lastUsedAt: null,
+  };
 }
 
 export function authenticate(
@@ -305,7 +348,16 @@ export function signupWithInvite(
     run();
     return {
       ok: true,
-      user: { id: userId, email: normalizedEmail, isAdmin: false, createdAt: now },
+      user: {
+        id: userId,
+        email: normalizedEmail,
+        isAdmin: false,
+        createdAt: now,
+        requestCount: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        lastUsedAt: null,
+      },
     };
   } catch (err) {
     const code = (err as { code?: string })?.code;

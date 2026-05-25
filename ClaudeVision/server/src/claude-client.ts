@@ -45,7 +45,12 @@ export class ClaudeClient {
     text: string,
     images: string[] | undefined,
     apiKey: string
-  ): Promise<{ responseText: string; toolCalls: ToolCallResult[] }> {
+  ): Promise<{
+    responseText: string;
+    toolCalls: ToolCallResult[];
+    inputTokens: number;
+    outputTokens: number;
+  }> {
     const anthropic = this.getAnthropic(apiKey);
 
     // Build the user message content
@@ -80,6 +85,10 @@ export class ClaudeClient {
     // Tool use loop
     const allToolCalls: ToolCallResult[] = [];
     let currentMessages = messages;
+    // Sum token usage across every iteration so the usage counter sees the
+    // full cost of a tool-using response, not just the final turn.
+    let inputTokens = 0;
+    let outputTokens = 0;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const response = await anthropic.messages.create({
@@ -89,6 +98,9 @@ export class ClaudeClient {
         messages: currentMessages,
         ...(tools.length > 0 ? { tools } : {}),
       });
+
+      inputTokens += response.usage?.input_tokens ?? 0;
+      outputTokens += response.usage?.output_tokens ?? 0;
 
       // Check if response contains tool use
       const toolUseBlocks = response.content.filter(
@@ -104,7 +116,7 @@ export class ClaudeClient {
         const responseText = textBlocks.join("\n");
 
         // Return the messages to append to history (user + assistant)
-        return { responseText, toolCalls: allToolCalls };
+        return { responseText, toolCalls: allToolCalls, inputTokens, outputTokens };
       }
 
       // Process tool calls
@@ -160,6 +172,8 @@ export class ClaudeClient {
       responseText:
         "I attempted to use several tools but reached the maximum number of iterations. Please try again with a simpler request.",
       toolCalls: allToolCalls,
+      inputTokens,
+      outputTokens,
     };
   }
 }
