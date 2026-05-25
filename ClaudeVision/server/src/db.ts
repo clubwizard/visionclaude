@@ -89,6 +89,15 @@ function runMigrations(db: Database.Database): void {
   addColumnIfMissing(db, "users", "input_tokens", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(db, "users", "output_tokens", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(db, "users", "last_used_at", "INTEGER");
+  // Bumped on every password reset (forgot-password flow + CLI). Sessions
+  // cache the version they were minted against; a mismatch destroys the
+  // session, so a successful reset logs out all other devices.
+  addColumnIfMissing(
+    db,
+    "users",
+    "pw_version",
+    "INTEGER NOT NULL DEFAULT 1"
+  );
 }
 
 function addColumnIfMissing(

@@ -63,8 +63,13 @@ if (typeof newPassword !== "string" || newPassword.length < 8) {
 
 const normalized = emailArg.toLowerCase();
 const hash = hashPassword(newPassword);
+// Bump pw_version too: any active session on any device for this user
+// gets invalidated on its next request. Operator-driven resets should be
+// at least as session-revoking as user-driven ones.
 const result = db
-  .prepare("UPDATE users SET password_hash = ? WHERE email = ?")
+  .prepare(
+    "UPDATE users SET password_hash = ?, pw_version = pw_version + 1 WHERE email = ?"
+  )
   .run(hash, normalized);
 
 if (result.changes === 0) {
@@ -76,4 +81,5 @@ if (result.changes === 0) {
 }
 
 console.log(`Password reset for ${normalized}. Log in with the new password.`);
+console.log("Active sessions for this user have been invalidated.");
 closeDb();

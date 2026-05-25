@@ -1,7 +1,6 @@
 import { Router, type Request } from "express";
 import {
   authenticate,
-  findUserById,
   findUserByEmail,
   countUsers,
   getUserKeyStatus,
@@ -11,7 +10,66 @@ import {
   consumePasswordResetToken,
   isPasswordResetTokenValid,
 } from "../users.js";
+import { getAuthenticatedUser } from "../middleware.js";
 import { sendPasswordResetEmail } from "../postmark.js";
+
+// ── Per-email rate limit for /auth/forgot-password ──────────────────
+//
+// The existing 5/min/IP cap on /auth limits the rate any one IP can hit
+// any auth endpoint — but it doesn't stop an attacker (or a botnet)
+// from spamming many resets to the SAME victim's inbox by rotating IPs.
+// This bounds the number of emails actually sent per address regardless
+// of how many sources request them.
+//
+// The check runs BEFORE the user lookup so the timing and response are
+// identical whether the email is registered, unregistered, or rate-
+// limited. Exceeded requests are silently dropped (still a 200) — that
+// keeps the no-enumeration property; an attacker can't probe by watching
+// for "rate-limited" responses.
+const FORGOT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const FORGOT_MAX_PER_WINDOW = 3;
+const forgotHistory = new Map<string, number[]>();
+let forgotSweepStarted = false;
+
+function startForgotSweeper(): void {
+  if (forgotSweepStarted) return;
+  forgotSweepStarted = true;
+  // .unref() so the timer doesn't keep the test process alive after
+  // assertions complete — and so Ctrl-C in dev still exits cleanly.
+  setInterval(() => {
+    const cutoff = Date.now() - FORGOT_WINDOW_MS;
+    for (const [key, history] of forgotHistory) {
+      const fresh = history.filter((t) => t > cutoff);
+      if (fresh.length === 0) forgotHistory.delete(key);
+      else forgotHistory.set(key, fresh);
+    }
+  }, FORGOT_WINDOW_MS).unref();
+}
+
+export function _consumeForgotQuotaForTests(emailNorm: string): boolean {
+  return consumeForgotQuota(emailNorm);
+}
+
+function consumeForgotQuota(emailNorm: string): boolean {
+  startForgotSweeper();
+  const now = Date.now();
+  const cutoff = now - FORGOT_WINDOW_MS;
+  const history = (forgotHistory.get(emailNorm) ?? []).filter((t) => t > cutoff);
+  if (history.length >= FORGOT_MAX_PER_WINDOW) {
+    // Still write back the filtered history so the sweeper's window stays
+    // accurate even while the email is rate-limited.
+    forgotHistory.set(emailNorm, history);
+    return false;
+  }
+  history.push(now);
+  forgotHistory.set(emailNorm, history);
+  return true;
+}
+
+// Test-only: reset the per-email quota between tests.
+export function _resetForgotQuotaForTests(): void {
+  forgotHistory.clear();
+}
 
 // Reset URL base. Prefers PUBLIC_BASE_URL (set this on prod behind Nginx
 // so the link is always https://your-domain regardless of which Host
@@ -52,6 +110,7 @@ export function createAuthRouter(): Router {
     }
     req.session.userId = user.id;
     req.session.isAdmin = user.isAdmin;
+    req.session.pwVersion = user.pwVersion;
     req.session.save((err) => {
       if (err) {
         res.status(500).json({ error: "Session error" });
@@ -69,11 +128,11 @@ export function createAuthRouter(): Router {
   });
 
   router.get("/check", (req, res) => {
-    if (!req.session.userId) {
-      res.json({ authenticated: false });
-      return;
-    }
-    const user = findUserById(req.session.userId);
+    // getAuthenticatedUser handles the "no session" case AND drops the
+    // session if a password reset has bumped pw_version since this session
+    // was minted. Either way the client sees authenticated: false and
+    // can re-prompt for login.
+    const user = getAuthenticatedUser(req);
     if (!user) {
       res.json({ authenticated: false });
       return;
@@ -162,6 +221,7 @@ export function createAuthRouter(): Router {
     }
     req.session.userId = result.user.id;
     req.session.isAdmin = result.user.isAdmin;
+    req.session.pwVersion = result.user.pwVersion;
     req.session.save((err) => {
       if (err) {
         res.status(500).json({ error: "Session error" });
@@ -196,7 +256,14 @@ export function createAuthRouter(): Router {
       res.json(generic);
       return;
     }
-    const userRow = findUserByEmail(email);
+    const emailNorm = email.toLowerCase();
+    // Per-email cap, applied BEFORE the user lookup so timing + response
+    // are identical for registered, unregistered, and rate-limited emails.
+    if (!consumeForgotQuota(emailNorm)) {
+      res.json(generic);
+      return;
+    }
+    const userRow = findUserByEmail(emailNorm);
     if (!userRow) {
       res.json(generic);
       return;

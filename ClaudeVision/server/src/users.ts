@@ -34,6 +34,10 @@ export interface User {
   inputTokens: number;
   outputTokens: number;
   lastUsedAt: number | null;
+  // Monotonically increasing per-user counter; bumped on password reset.
+  // Sessions store the version they were minted against, so a reset
+  // invalidates every other active session for that user.
+  pwVersion: number;
 }
 
 interface UserRow {
@@ -48,6 +52,7 @@ interface UserRow {
   input_tokens: number;
   output_tokens: number;
   last_used_at: number | null;
+  pw_version: number;
 }
 
 interface InviteRow {
@@ -69,6 +74,7 @@ function rowToUser(row: UserRow): User {
     inputTokens: row.input_tokens ?? 0,
     outputTokens: row.output_tokens ?? 0,
     lastUsedAt: row.last_used_at,
+    pwVersion: row.pw_version ?? 1,
   };
 }
 
@@ -187,6 +193,7 @@ export function createUser(input: CreateUserInput): User {
     inputTokens: 0,
     outputTokens: 0,
     lastUsedAt: null,
+    pwVersion: 1,
   };
 }
 
@@ -383,6 +390,7 @@ export function signupWithInvite(
         inputTokens: 0,
         outputTokens: 0,
         lastUsedAt: null,
+        pwVersion: 1,
       },
     };
   } catch (err) {
@@ -445,8 +453,10 @@ export function consumePasswordResetToken(
     `UPDATE password_resets SET used_at = ?
      WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?`
   );
+  // Bump pw_version alongside the hash so any session minted before this
+  // reset (on any device) fails the version check on its next request.
   const updatePassword = db.prepare(
-    "UPDATE users SET password_hash = ? WHERE id = ?"
+    "UPDATE users SET password_hash = ?, pw_version = pw_version + 1 WHERE id = ?"
   );
   const revokeOthers = db.prepare(
     `UPDATE password_resets SET used_at = ?
@@ -478,6 +488,18 @@ export function consumePasswordResetToken(
     if (code === "INVALID_RESET_TOKEN") return { ok: false, reason: "invalid_token" };
     throw err;
   }
+}
+
+// Used by the admin CLI (dist/reset-password.js) to invalidate active
+// sessions when an operator rewrites a password out-of-band. The forgot-
+// password flow doesn't need to call this — consumePasswordResetToken
+// already bumps the version atomically with the hash update.
+export function bumpPasswordVersion(userId: string): boolean {
+  const db = getDb();
+  const r = db
+    .prepare("UPDATE users SET pw_version = pw_version + 1 WHERE id = ?")
+    .run(userId);
+  return r.changes > 0;
 }
 
 // Lightweight pre-check used by the reset-password page so it can show
