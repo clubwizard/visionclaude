@@ -5,8 +5,12 @@ package-lock.json
 
 # Build output
 server/dist/
+ClaudeVision/server/dist/
 ios/build/
 ios/DerivedData/
+
+# SQLite data directory (created at runtime by getDb())
+ClaudeVision/server/data/
 
 # Environment (contains API key!)
 .env
