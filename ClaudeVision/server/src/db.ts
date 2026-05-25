@@ -62,6 +62,21 @@ function runMigrations(db: Database.Database): void {
       ON conversations(updated_at);
     CREATE INDEX IF NOT EXISTS idx_conversations_user_id
       ON conversations(user_id);
+
+    -- Password reset tokens. token_hash is sha256(raw token) so a leaked
+    -- DB still doesn't yield replayable links — the raw token only ever
+    -- lives in the user's email + URL. Single-use: used_at gates redemption.
+    CREATE TABLE IF NOT EXISTS password_resets (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_password_resets_user_id
+      ON password_resets(user_id);
+    CREATE INDEX IF NOT EXISTS idx_password_resets_expires_at
+      ON password_resets(expires_at);
   `);
 
   // Incremental columns — SQLite has no IF NOT EXISTS for ADD COLUMN, so

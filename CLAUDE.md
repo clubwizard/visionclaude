@@ -68,6 +68,13 @@ Three overlapping mechanisms in `src/middleware.ts`:
 
 The app sits behind Nginx in production (`docker-compose.yml` binds `127.0.0.1`), which is why `trust proxy` is set and the session cookie uses `secure: false` + `sameSite: lax`. Don't "fix" these without understanding the proxy setup — see the recent commit history (`fix/session-cookie` PRs) for the rationale.
 
+### Password recovery (Postmark)
+`POST /auth/forgot-password` accepts `{ email }` and **always returns 200** — never enumerates. If the email matches a real user, `createPasswordResetToken()` in `users.ts` mints a 32-byte hex token, stores only its SHA-256 in `password_resets`, and `sendPasswordResetEmail()` (in `postmark.ts`) posts the raw token as a `/reset-password?token=...` link to Postmark's `/email` endpoint. If `POSTMARK_API_KEY` or `POSTMARK_FROM_EMAIL` are unset, the URL is logged to the operator console instead — useful for local dev. `PUBLIC_BASE_URL` overrides the link base (set this on prod); otherwise the link is built from `req.protocol + Host` (which respects `X-Forwarded-Proto` because `trust proxy = 1`).
+
+`POST /auth/reset-password` validates expiry + single-use, atomically marks the token used, updates `password_hash`, and revokes every other outstanding reset for that user (so a double-request can't be replayed after one link is used). Tokens are SHA-256-hashed at rest — a leaked DB still doesn't yield replayable links. TTL is 1 hour. The reset does **not** auto-login; the user is bounced to the login form to confirm. Limitation: active session cookies are not invalidated by a reset (`express-session` uses MemoryStore with no per-user revocation hook); cookies still expire at the 24h `maxAge`.
+
+For a CLI fallback when email is unavailable, `dist/reset-password.js` (run via `docker exec ... npm run reset-password -- <email> <pw>`) writes the password hash directly to the DB.
+
 ### Channel mode (`ClaudeVision/channel/server.ts`)
 One big Bun file. Two surfaces:
 - An MCP `Server` over `StdioServerTransport` exposing `reply` and `edit_message` tools that Claude Code calls to talk back to the phone.

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { getDb } from "./db.js";
 import {
@@ -9,6 +10,11 @@ import {
 } from "./crypto.js";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function hashResetToken(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex");
+}
 
 // MEDIUM: Validate email format server-side before any DB operation.
 // Intentionally stricter than RFC 5322 — rejects punctuation that's legal
@@ -386,4 +392,106 @@ export function signupWithInvite(
       return { ok: false, reason: "email_taken" };
     throw err;
   }
+}
+
+// ── Password reset ──
+//
+// Flow: forgot-password → createPasswordResetToken(user) returns a raw
+// token; only sha256(raw) is stored. The raw token is emailed and never
+// touches the DB again. consumePasswordResetToken validates and atomically
+// (a) marks that token used, (b) overwrites password_hash, (c) revokes
+// every other outstanding reset for that user so the second link in a
+// double-request can't be replayed after the first succeeds.
+
+export function createPasswordResetToken(userId: string): {
+  rawToken: string;
+  expiresAt: number;
+} {
+  const db = getDb();
+  const rawToken = generateToken(32); // 64 hex chars, 256 bits
+  const tokenHash = hashResetToken(rawToken);
+  const now = Date.now();
+  const expiresAt = now + PASSWORD_RESET_TTL_MS;
+  // Opportunistic GC — keep the table small without a separate sweeper.
+  db.prepare("DELETE FROM password_resets WHERE expires_at < ?").run(now);
+  db.prepare(
+    `INSERT INTO password_resets (token_hash, user_id, created_at, expires_at)
+     VALUES (?, ?, ?, ?)`
+  ).run(tokenHash, userId, now, expiresAt);
+  return { rawToken, expiresAt };
+}
+
+export type ResetResult =
+  | { ok: true; userId: string }
+  | { ok: false; reason: "invalid_token" };
+
+export function consumePasswordResetToken(
+  rawToken: string,
+  newPassword: string
+): ResetResult {
+  if (typeof rawToken !== "string" || !rawToken) {
+    return { ok: false, reason: "invalid_token" };
+  }
+  const db = getDb();
+  const tokenHash = hashResetToken(rawToken);
+  const now = Date.now();
+  const newHash = hashPassword(newPassword);
+
+  const lookup = db.prepare(
+    `SELECT user_id FROM password_resets
+     WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?`
+  );
+  const markUsed = db.prepare(
+    `UPDATE password_resets SET used_at = ?
+     WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?`
+  );
+  const updatePassword = db.prepare(
+    "UPDATE users SET password_hash = ? WHERE id = ?"
+  );
+  const revokeOthers = db.prepare(
+    `UPDATE password_resets SET used_at = ?
+     WHERE user_id = ? AND used_at IS NULL`
+  );
+
+  function invalid(): Error {
+    const e = new Error("INVALID_RESET_TOKEN");
+    (e as Error & { code?: string }).code = "INVALID_RESET_TOKEN";
+    return e;
+  }
+
+  let foundUserId = "";
+  const run = db.transaction(() => {
+    const row = lookup.get(tokenHash, now) as { user_id: string } | undefined;
+    if (!row) throw invalid();
+    foundUserId = row.user_id;
+    const r = markUsed.run(now, tokenHash, now);
+    if (r.changes === 0) throw invalid(); // lost the race with a concurrent use
+    updatePassword.run(newHash, foundUserId);
+    revokeOthers.run(now, foundUserId);
+  });
+
+  try {
+    run();
+    return { ok: true, userId: foundUserId };
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === "INVALID_RESET_TOKEN") return { ok: false, reason: "invalid_token" };
+    throw err;
+  }
+}
+
+// Lightweight pre-check used by the reset-password page so it can show
+// "this link has expired" before the user types a new password. Returns
+// only true/false — no user email — to limit enumeration.
+export function isPasswordResetTokenValid(rawToken: string): boolean {
+  if (typeof rawToken !== "string" || !rawToken) return false;
+  const db = getDb();
+  const tokenHash = hashResetToken(rawToken);
+  const row = db
+    .prepare(
+      `SELECT 1 AS ok FROM password_resets
+       WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?`
+    )
+    .get(tokenHash, Date.now());
+  return !!row;
 }
