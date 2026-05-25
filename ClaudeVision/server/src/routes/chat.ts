@@ -3,7 +3,7 @@ import type { ClaudeClient } from "../claude-client.js";
 import type { ConversationStore } from "../conversation.js";
 import type { RequestQueue } from "../middleware.js";
 import type { ChatRequest, ChatResponse } from "../types.js";
-import { getUserApiKey } from "../users.js";
+import { getUserApiKey, incrementUsage } from "../users.js";
 
 const MAX_VISION_CONTEXT_IMAGES = Math.max(
   1,
@@ -84,9 +84,14 @@ export function createChatRouter(
       const chatFn = () =>
         claudeClient.chat(messages, body.text || "", body.images, anthropicKey);
 
-      const { responseText, toolCalls } = requestQueue
+      const { responseText, toolCalls, inputTokens, outputTokens } = requestQueue
         ? await requestQueue.enqueue(chatFn)
         : await chatFn();
+
+      // Best-effort usage tracking — only count when scoped to a real
+      // user (gateway-key iOS calls are anonymous and not tracked here).
+      const userId = req.session?.userId;
+      if (userId) incrementUsage(userId, inputTokens, outputTokens);
 
       const userContent: any[] = [];
       if (body.images && body.images.length > 0) {

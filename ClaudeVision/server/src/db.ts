@@ -52,6 +52,12 @@ function runMigrations(db: Database.Database): void {
   // we check first via PRAGMA and only add when missing. Add new
   // additive migrations here when expanding the schema.
   addColumnIfMissing(db, "users", "api_key_openai_enc", "TEXT");
+  // Per-user usage tracking — admin-visible counters; not authoritative
+  // billing, just a "what's happening" view in the Account → Users list.
+  addColumnIfMissing(db, "users", "request_count", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(db, "users", "input_tokens", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(db, "users", "output_tokens", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(db, "users", "last_used_at", "INTEGER");
 }
 
 function addColumnIfMissing(
