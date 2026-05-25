@@ -46,6 +46,22 @@ function runMigrations(db: Database.Database): void {
       used_by TEXT REFERENCES users(id),
       used_at INTEGER
     );
+
+    -- Persisted chat history. id is the scoped form "user:<uid>|<convId>"
+    -- or "gateway|<convId>" so isolation is enforced at the key level.
+    -- user_id is nullable (gateway/iOS path has no session) but indexed
+    -- so we can cascade-delete a user's conversations and so future admin
+    -- views can list per-user.
+    CREATE TABLE IF NOT EXISTS conversations (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      messages TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_conversations_updated_at
+      ON conversations(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_conversations_user_id
+      ON conversations(user_id);
   `);
 
   // Incremental columns — SQLite has no IF NOT EXISTS for ADD COLUMN, so

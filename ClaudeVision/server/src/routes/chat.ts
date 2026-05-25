@@ -69,17 +69,24 @@ export function createChatRouter(
         return;
       }
 
+      const userId = req.session?.userId ?? null;
       const scopedId = body.conversation_id
         ? `${scope}|${body.conversation_id}`
         : undefined;
-      const { id: storedId, messages } = conversations.getOrCreate(scopedId);
+      const { id: storedId } = conversations.getOrCreate(scopedId, userId);
 
       const incomingImageCount = body.images?.length ?? 0;
       const historyImageBudget = Math.max(
         0,
         MAX_VISION_CONTEXT_IMAGES - incomingImageCount
       );
-      conversations.pruneImageHistory(storedId, historyImageBudget);
+      // pruneImageHistory persists the pruned messages and returns them,
+      // so the array we hand to Claude reflects whatever images were
+      // dropped on this turn.
+      const messages = conversations.pruneImageHistory(
+        storedId,
+        historyImageBudget
+      );
 
       const chatFn = () =>
         claudeClient.chat(messages, body.text || "", body.images, anthropicKey);
@@ -90,7 +97,6 @@ export function createChatRouter(
 
       // Best-effort usage tracking — only count when scoped to a real
       // user (gateway-key iOS calls are anonymous and not tracked here).
-      const userId = req.session?.userId;
       if (userId) incrementUsage(userId, inputTokens, outputTokens);
 
       const userContent: any[] = [];
