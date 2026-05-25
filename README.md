@@ -30,14 +30,16 @@
 
 ---
 
-**VisionClaude** turns your iPhone or Meta Ray-Ban Smart Glasses into Claude's eyes and ears. Your phone connects directly to your Claude Code session — speak naturally, and Claude sees what you see, responds with voice, and uses ALL your MCP tools and skills.
+**VisionClaude** turns your iPhone or Meta Ray-Ban Smart Glasses into Claude's eyes and ears. Your phone connects directly to your Claude Code or Claude Desktop / Cowork session — speak naturally, and Claude sees what you see, responds with voice, and uses ALL your MCP tools and skills.
 
 ```
-iPhone/Glasses  ──→  Channel Plugin  ──→  Claude Code (Opus)
+iPhone/Glasses  ──→  Channel Plugin  ──→  Claude Code OR Cowork
   (camera+voice)     (WebSocket)          ALL your MCP tools
                                           ALL your skills
                                           Full Cowork session
 ```
+
+> 📖 **First time here?** Read the [Help Guide](ClaudeVision/docs/HELP.md) — it covers what VisionClaude is, the three ways to use it, full setup walkthroughs, settings reference, troubleshooting, and a glossary of all the moving parts.
 
 ## Quick Start (5 minutes)
 
@@ -68,7 +70,9 @@ The interactive installer handles dependencies, API keys, and Xcode project gene
 
 ### Step 2: Start the Channel
 
-Add VisionClaude as an MCP server in your project's `.mcp.json`:
+VisionClaude registers as an MCP server with **both** Claude Code (`.mcp.json`) and Claude Desktop / **Cowork** (`claude_desktop_config.json`). Same server, same tools — pick whichever surface you use.
+
+**For Claude Code** (`.mcp.json` in your project root):
 
 ```json
 {
@@ -81,11 +85,13 @@ Add VisionClaude as an MCP server in your project's `.mcp.json`:
 }
 ```
 
-Then launch Claude Code with the channel enabled:
+Launch with the channel enabled:
 
 ```bash
 claude --dangerously-load-development-channels "server:visionclaude"
 ```
+
+**For Claude Desktop / Cowork** — follow the dedicated walkthrough in [`ClaudeVision/docs/CLAUDE_DESKTOP_SETUP.md`](ClaudeVision/docs/CLAUDE_DESKTOP_SETUP.md). It covers config-file paths on macOS/Windows, PATH issues with `bun`, troubleshooting MCP logs, and how Dispatch pairing fits in. TL;DR — add the same `mcpServers.visionclaude` block to `~/Library/Application Support/Claude/claude_desktop_config.json`, restart Claude Desktop, and the agent gains the same four VisionClaude tools.
 
 ### Step 3: Get Your Token
 

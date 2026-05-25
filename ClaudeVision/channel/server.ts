@@ -85,9 +85,81 @@ type WireOut =
   | { type: 'reply'; id: string; text: string; audio_url?: string }
   | { type: 'status'; status: string }
   | { type: 'thinking'; text: string }
+  // Cowork-connector pull pattern: server asks the phone for fresh sensor
+  // input. The phone fulfils the request by POSTing /upload (snapshot)
+  // or /message (voice transcription) with the same request_id, which
+  // resolves the pending promise on the server.
+  | { type: 'request_snapshot'; request_id: string; source: 'iphone' | 'rayban'; prompt?: string }
+  | { type: 'request_voice'; request_id: string; prompt: string; timeout_ms: number }
 
 const clients = new Set<ServerWebSocket<unknown>>()
 let seq = 0
+
+// Pull-pattern correlation map: tool calls push a Wire message asking the
+// phone to do something, then await a fulfilment on the inbound /upload
+// or /message route keyed by the same request_id. Timeouts reject the
+// promise so the MCP tool returns an error instead of hanging forever.
+interface PendingSnapshot {
+  kind: 'snapshot'
+  resolve: (img: { path: string; mime: string; bytes: Buffer }) => void
+  reject: (err: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+interface PendingVoice {
+  kind: 'voice'
+  resolve: (text: string) => void
+  reject: (err: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+type PendingRequest = PendingSnapshot | PendingVoice
+const pendingRequests = new Map<string, PendingRequest>()
+
+function awaitPendingSnapshot(
+  requestId: string,
+  timeoutMs: number,
+): Promise<{ path: string; mime: string; bytes: Buffer }> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingRequests.delete(requestId)
+      reject(new Error(`snapshot request timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+    pendingRequests.set(requestId, { kind: 'snapshot', resolve, reject, timer })
+  })
+}
+
+function awaitPendingVoice(
+  requestId: string,
+  timeoutMs: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingRequests.delete(requestId)
+      reject(new Error(`voice request timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+    pendingRequests.set(requestId, { kind: 'voice', resolve, reject, timer })
+  })
+}
+
+function resolveSnapshot(
+  requestId: string,
+  payload: { path: string; mime: string; bytes: Buffer },
+): boolean {
+  const pending = pendingRequests.get(requestId)
+  if (!pending || pending.kind !== 'snapshot') return false
+  clearTimeout(pending.timer)
+  pendingRequests.delete(requestId)
+  pending.resolve(payload)
+  return true
+}
+
+function resolveVoice(requestId: string, text: string): boolean {
+  const pending = pendingRequests.get(requestId)
+  if (!pending || pending.kind !== 'voice') return false
+  clearTimeout(pending.timer)
+  pendingRequests.delete(requestId)
+  pending.resolve(text)
+  return true
+}
 
 // Activity log (last 50 messages)
 type ActivityEntry = { ts: string; direction: 'in' | 'out'; source: string; text: string; hasImage?: boolean }
@@ -151,26 +223,49 @@ const mcp = new Server(
       experimental: { 'claude/channel': {} },
     },
     instructions: [
-      'VisionClaude bridges an iOS app with camera, voice, and Meta Ray-Ban glasses.',
+      'VisionClaude gives Claude (Code or Cowork) wearable eyes + ears via an iOS app and ',
+      'optional Meta Ray-Ban Smart Glasses. Two interaction modes:',
       '',
-      'Messages arrive as <channel source="visionclaude" ...>.',
-      'If the tag has a file_path attribute, Read that file — it is an image from the phone camera or glasses.',
+      '1. PHONE-INITIATED (push). The user speaks or captures an image; a message arrives as',
+      '   <channel source="visionclaude" ...>. If the tag has a file_path attribute, Read that',
+      '   file — it is an image from the camera or glasses.',
       '',
-      'IMPORTANT VISION INSTRUCTIONS:',
-      '- When an image is attached, ALWAYS describe what you see with high specificity.',
+      '2. AGENT-INITIATED (pull). Use these tools mid-task to ask the phone for fresh sensor input:',
+      '   - get_camera_snapshot — grab a fresh photo. Use when you need to SEE something the user',
+      '     is looking at right now (a screen, a receipt, a label) and they haven\'t just sent one.',
+      '   - request_voice_input — speak ONE short clarifying question and wait for the user\'s',
+      '     spoken reply. Use sparingly — only when you genuinely need a missing detail to proceed.',
+      '',
+      'REPLY through the reply tool — your transcript output never reaches the iOS app.',
+      'Keep replies concise (1-3 sentences) for voice responses unless asked for detail.',
+      '',
+      'VISION INSTRUCTIONS when describing an image:',
       '- Read all visible text exactly (signs, screens, labels, brands, prices).',
-      '- Use proper nouns: "silver MacBook Pro" not "a laptop", "iPhone 15 Pro" not "a phone".',
+      '- Use proper nouns: "silver MacBook Pro" not "a laptop".',
       '- Note spatial relationships: "to the left of", "behind the", "on top of".',
       '- Be conversational — the user is wearing glasses or holding a phone, speak naturally.',
       '',
-      'Reply ONLY through the reply tool — your transcript output never reaches the iOS app.',
-      'Keep replies concise (1-3 sentences) for voice responses unless asked for detail.',
       `The iOS app connects via WebSocket at ws://localhost:${PORT}/ws.`,
     ].join('\n'),
   },
 )
 
-// ── Tools: reply + reply_with_voice ─────────────────────────────────────────
+// ── Tools: reply + sensor pulls ─────────────────────────────────────────────
+//
+// Two interaction patterns:
+//
+//   1. Phone-initiated (existing): the user speaks/captures, the phone
+//      POSTs a message which arrives via deliver() as a channel
+//      notification. Claude/Cowork replies through `reply`.
+//
+//   2. Server-initiated (new — Cowork connector pattern): the agent calls
+//      `get_camera_snapshot` or `request_voice_input` mid-task to pull a
+//      fresh image or short utterance from the phone. Implemented as a
+//      WS message → phone fulfils → MCP tool returns the result inline.
+//
+// The new tools enable flows like: "look up Sarah's email, send the train
+// confirmation. If unsure of the address, ask the user." Cowork can call
+// `request_voice_input` to disambiguate without breaking the task loop.
 mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
@@ -196,6 +291,54 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           text: { type: 'string' },
         },
         required: ['message_id', 'text'],
+      },
+    },
+    {
+      name: 'get_camera_snapshot',
+      description:
+        'Pull a fresh photo from the user\'s active camera (iPhone or Ray-Ban glasses). ' +
+        'Returns an image content block. Use this when you need to SEE something the user is ' +
+        'looking at right now — a screen, a receipt, a label — not when the user has already ' +
+        'sent an image (those arrive as channel notifications). Default timeout is 15s.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          source: {
+            type: 'string',
+            enum: ['iphone', 'rayban'],
+            description: 'Which camera to use. Defaults to iphone if both are available.',
+          },
+          prompt: {
+            type: 'string',
+            description: 'Optional one-line context the iOS app may show on screen (e.g. "Show me the laptop screen").',
+          },
+          timeout_ms: {
+            type: 'number',
+            description: 'Hard cap on how long to wait for the phone to deliver (default 15000).',
+          },
+        },
+      },
+    },
+    {
+      name: 'request_voice_input',
+      description:
+        'Speak a prompt aloud to the user (via ElevenLabs TTS if configured) and wait for their ' +
+        'spoken reply. Returns the transcribed text. Use this for one clarifying question mid-task, ' +
+        'NOT for free-form conversation — the user pushes those through the channel directly. ' +
+        'Default timeout is 30s; the prompt should be ≤1 sentence.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          prompt: {
+            type: 'string',
+            description: 'What to ask the user. One sentence.',
+          },
+          timeout_ms: {
+            type: 'number',
+            description: 'How long to wait for the user to respond (default 30000).',
+          },
+        },
+        required: ['prompt'],
       },
     },
   ],
@@ -232,6 +375,91 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
       case 'edit_message': {
         broadcast({ type: 'reply', id: args.message_id as string, text: args.text as string })
         return { content: [{ type: 'text', text: 'ok' }] }
+      }
+
+      case 'get_camera_snapshot': {
+        if (clients.size === 0) {
+          return {
+            content: [{ type: 'text', text: 'no iOS clients connected — cannot capture snapshot' }],
+            isError: true,
+          }
+        }
+        const source = ((args.source as string) === 'rayban' ? 'rayban' : 'iphone') as
+          | 'iphone'
+          | 'rayban'
+        const promptText = (args.prompt as string | undefined) ?? undefined
+        const timeoutMs = Math.min(Math.max(Number(args.timeout_ms ?? 15000) || 15000, 1000), 60000)
+        const requestId = `req-snap-${Date.now()}-${++seq}`
+        log(`↗ get_camera_snapshot (${source}) request=${requestId} timeout=${timeoutMs}ms`)
+
+        const promise = awaitPendingSnapshot(requestId, timeoutMs)
+        broadcast({ type: 'request_snapshot', request_id: requestId, source, prompt: promptText })
+
+        try {
+          const img = await promise
+          const ext = extname(img.path).toLowerCase()
+          const mimeType = mime(ext)
+          log(`↙ snapshot received for ${requestId} (${(img.bytes.length / 1024).toFixed(0)}KB ${mimeType})`)
+          return {
+            content: [
+              {
+                type: 'image',
+                data: img.bytes.toString('base64'),
+                mimeType,
+              },
+              {
+                type: 'text',
+                text: `Captured from ${source}. Local path: ${img.path}`,
+              },
+            ],
+          }
+        } catch (err) {
+          return {
+            content: [{ type: 'text', text: err instanceof Error ? err.message : String(err) }],
+            isError: true,
+          }
+        }
+      }
+
+      case 'request_voice_input': {
+        if (clients.size === 0) {
+          return {
+            content: [{ type: 'text', text: 'no iOS clients connected — cannot request voice input' }],
+            isError: true,
+          }
+        }
+        const promptText = args.prompt as string
+        if (typeof promptText !== 'string' || !promptText.trim()) {
+          return {
+            content: [{ type: 'text', text: 'prompt is required and must be a non-empty string' }],
+            isError: true,
+          }
+        }
+        const timeoutMs = Math.min(Math.max(Number(args.timeout_ms ?? 30000) || 30000, 2000), 120000)
+        const requestId = `req-voice-${Date.now()}-${++seq}`
+        log(`↗ request_voice_input "${promptText.slice(0, 50)}" request=${requestId} timeout=${timeoutMs}ms`)
+
+        // Generate TTS for the prompt so the user actually hears the question.
+        // The audio is delivered alongside the request so the phone can play it.
+        const audioUrl = await generateTTS(promptText)
+
+        const promise = awaitPendingVoice(requestId, timeoutMs)
+        broadcast({ type: 'request_voice', request_id: requestId, prompt: promptText, timeout_ms: timeoutMs })
+        // Also push a reply-style message so the prompt shows up in the
+        // transcript and (if TTS is on) is spoken aloud. The phone treats
+        // request_voice as the "start listening" signal.
+        broadcast({ type: 'reply', id: `${requestId}-prompt`, text: promptText, audio_url: audioUrl })
+
+        try {
+          const text = await promise
+          log(`↙ voice reply for ${requestId}: "${text.slice(0, 60)}"`)
+          return { content: [{ type: 'text', text }] }
+        } catch (err) {
+          return {
+            content: [{ type: 'text', text: err instanceof Error ? err.message : String(err) }],
+            isError: true,
+          }
+        }
       }
 
       default:
@@ -356,16 +584,30 @@ Bun.serve({
         const id = String(form.get('id') ?? nextId())
         const text = String(form.get('text') ?? '')
         const source = (String(form.get('source') ?? 'iphone')) as 'iphone' | 'rayban'
+        const requestId = form.get('request_id') ? String(form.get('request_id')) : undefined
         const f = form.get('image') ?? form.get('file')
 
-        let image: { path: string; name: string } | undefined
+        let image: { path: string; name: string; bytes: Buffer } | undefined
         if (f instanceof File && f.size > 0) {
           mkdirSync(INBOX_DIR, { recursive: true })
           const ext = extname(f.name).toLowerCase() || '.jpg'
           const path = join(INBOX_DIR, `${Date.now()}-${source}${ext}`)
-          writeFileSync(path, Buffer.from(await f.arrayBuffer()))
-          image = { path, name: f.name }
+          const bytes = Buffer.from(await f.arrayBuffer())
+          writeFileSync(path, bytes)
+          image = { path, name: f.name, bytes }
           log(`📷 saved ${source} image: ${path} (${(f.size / 1024).toFixed(0)}KB)`)
+        }
+
+        // If this image is fulfilling a get_camera_snapshot tool call,
+        // resolve the waiting promise INSTEAD of delivering it as a new
+        // channel notification — the agent already has the message in the
+        // tool result. Falls through to deliver() if the request_id is
+        // unknown (e.g. a delayed response after the timeout fired).
+        if (requestId && image) {
+          const mimeType = mime(extname(image.path).toLowerCase())
+          if (resolveSnapshot(requestId, { path: image.path, mime: mimeType, bytes: image.bytes })) {
+            return new Response(null, { status: 204 })
+          }
         }
 
         deliver(id, text, source, image)
@@ -376,10 +618,18 @@ Bun.serve({
     // ── Text-only message via POST ──────────────────────────────────────
     if (url.pathname === '/message' && req.method === 'POST') {
       return (async () => {
-        const body = await req.json() as { text?: string; source?: string; id?: string }
+        const body = await req.json() as { text?: string; source?: string; id?: string; request_id?: string }
         const id = body.id ?? nextId()
         const source = (body.source ?? 'iphone') as 'iphone' | 'rayban'
         const text = body.text ?? ''
+
+        // Voice-input fulfilment path: don't deliver as a new channel
+        // notification; resolve the waiting request_voice_input tool call.
+        if (body.request_id && resolveVoice(body.request_id, text)) {
+          logActivity({ ts: new Date().toISOString(), direction: 'in', source, text: `[voice-reply] ${text.slice(0, 100)}` })
+          return Response.json({ ok: true, id, fulfilled: body.request_id })
+        }
+
         deliver(id, text, source)
         logActivity({ ts: new Date().toISOString(), direction: 'in', source, text: text.slice(0, 100) })
         return Response.json({ ok: true, id, delivered_to: clients.size, clients: clients.size })
@@ -495,19 +745,34 @@ Bun.serve({
           text?: string
           source?: string
           image?: string  // base64
+          request_id?: string
         }
         const id = msg.id ?? nextId()
         const source = (msg.source ?? 'iphone') as 'iphone' | 'rayban'
 
         // If image is included as base64, save to disk
-        let image: { path: string; name: string } | undefined
+        let image: { path: string; name: string; bytes: Buffer } | undefined
         if (msg.image) {
           mkdirSync(INBOX_DIR, { recursive: true })
           const buf = Buffer.from(msg.image, 'base64')
           const path = join(INBOX_DIR, `${Date.now()}-${source}.jpg`)
           writeFileSync(path, buf)
-          image = { path, name: `${source}-frame.jpg` }
+          image = { path, name: `${source}-frame.jpg`, bytes: buf }
           log(`📷 saved ${source} frame via WS (${(buf.length / 1024).toFixed(0)}KB)`)
+        }
+
+        // Pull-pattern fulfilment over WS — same correlation logic as the
+        // HTTP routes. Snapshot fulfilment needs an image; voice
+        // fulfilment needs text.
+        if (msg.request_id) {
+          if (image && resolveSnapshot(msg.request_id, { path: image.path, mime: mime(extname(image.path)), bytes: image.bytes })) {
+            return
+          }
+          if (msg.text && resolveVoice(msg.request_id, msg.text)) {
+            return
+          }
+          // request_id provided but doesn't match a pending request →
+          // fall through to deliver() so the message isn't silently lost.
         }
 
         if (msg.text?.trim() || image) {
@@ -530,5 +795,10 @@ log(`   🔐 Channel Token: ${CHANNEL_TOKEN}`)
 log(`   Dashboard:  http://localhost:${PORT}`)
 log(`   Enter token in iOS app → Settings → Channel Token`)
 
-// Auto-open dashboard in default browser
-Bun.spawn(['open', `http://localhost:${PORT}`], { stdout: 'ignore', stderr: 'ignore' })
+// Auto-open dashboard in default browser (best-effort: `open` only exists on
+// macOS; on Linux/Windows this is a no-op rather than a crash).
+try {
+  Bun.spawn(['open', `http://localhost:${PORT}`], { stdout: 'ignore', stderr: 'ignore' })
+} catch {
+  // expected on non-macOS hosts
+}

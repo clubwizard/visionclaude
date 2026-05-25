@@ -135,6 +135,42 @@ class SessionViewModel: ObservableObject {
                 self?.state = .disconnected
             }
         }
+
+        // Cowork pull-pattern: agent (Claude Desktop / Cowork) wants a
+        // fresh frame from the user's active camera mid-task. We pull from
+        // the source's latest frame buffer — usually <100ms old since
+        // both managers stream continuously while connected.
+        bridge.onSnapshotRequest = { [weak self] requestId, source, _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let frame: Data?
+                switch source {
+                case "rayban": frame = self.rayBanManager.latestFrame
+                default:       frame = self.cameraManager.latestFrame
+                }
+                guard let frame else {
+                    print("[Session] No frame available to fulfil snapshot \(requestId)")
+                    return // tool call will time out — preferable to sending stale or empty data
+                }
+                do {
+                    try await self.bridge.fulfilSnapshot(requestId: requestId, image: frame, source: source)
+                } catch {
+                    print("[Session] Snapshot fulfilment failed: \(error)")
+                }
+            }
+        }
+
+        // TODO(voice-input fulfilment): integrate with SpeechManager so a
+        // `request_voice` from the server (a) interrupts any ongoing
+        // listen, (b) waits for the accompanying TTS reply to finish
+        // speaking, (c) starts a one-shot recognition session, (d) routes
+        // the final transcript to bridge.fulfilVoice(requestId:text:)
+        // instead of bridge.sendMessage(). Until this is wired, the
+        // server-side tool call times out; agents should avoid
+        // request_voice_input until iOS support ships in a follow-up.
+        bridge.onVoiceRequest = { requestId, prompt, _ in
+            print("[Session] Voice input requested but not yet implemented in iOS: \(requestId) prompt=\"\(prompt.prefix(60))\"")
+        }
     }
 
     // MARK: - QR/Barcode Detection

@@ -3,10 +3,16 @@ import { createHash } from "node:crypto";
 import {
   createUser,
   authenticate,
+  findUserById,
+  bumpPasswordVersion,
   createPasswordResetToken,
   consumePasswordResetToken,
   isPasswordResetTokenValid,
 } from "../src/users.js";
+import {
+  _consumeForgotQuotaForTests,
+  _resetForgotQuotaForTests,
+} from "../src/routes/auth.js";
 import { getDb, closeDb } from "../src/db.js";
 
 beforeAll(() => {
@@ -20,6 +26,7 @@ afterAll(() => {
 beforeEach(() => {
   const db = getDb();
   db.exec("DELETE FROM password_resets; DELETE FROM users;");
+  _resetForgotQuotaForTests();
 });
 
 function sha256(s: string): string {
@@ -119,6 +126,57 @@ describe("consumePasswordResetToken", () => {
     // And the user's password is the one set by the t2 redemption.
     expect(authenticate("a@b.co", "brandNewPW456")).not.toBeNull();
     expect(authenticate("a@b.co", "anotherPW789")).toBeNull();
+  });
+});
+
+describe("pw_version bump on password reset", () => {
+  it("new users start at pw_version=1", () => {
+    const u = createUser({ email: "fresh@x.com", password: "longenough" });
+    expect(u.pwVersion).toBe(1);
+    const live = findUserById(u.id);
+    expect(live?.pwVersion).toBe(1);
+  });
+
+  it("consumePasswordResetToken bumps pw_version atomically with the hash update", () => {
+    const u = createUser({ email: "rotate@x.com", password: "originalPW123" });
+    expect(u.pwVersion).toBe(1);
+    const { rawToken } = createPasswordResetToken(u.id);
+    const r = consumePasswordResetToken(rawToken, "brandNewPW456");
+    expect(r.ok).toBe(true);
+    const after = findUserById(u.id);
+    expect(after?.pwVersion).toBe(2);
+  });
+
+  it("a failed reset does not bump the version", () => {
+    const u = createUser({ email: "noreset@x.com", password: "originalPW123" });
+    consumePasswordResetToken("nope-not-a-token", "anyPassword12");
+    expect(findUserById(u.id)?.pwVersion).toBe(1);
+  });
+
+  it("bumpPasswordVersion (CLI helper) increments and reports whether the row existed", () => {
+    const u = createUser({ email: "cli@x.com", password: "originalPW123" });
+    expect(bumpPasswordVersion(u.id)).toBe(true);
+    expect(findUserById(u.id)?.pwVersion).toBe(2);
+    expect(bumpPasswordVersion("does-not-exist")).toBe(false);
+  });
+});
+
+describe("per-email forgot-password rate limit", () => {
+  it("allows the first 3 in a window and then silently drops the 4th+", () => {
+    expect(_consumeForgotQuotaForTests("a@b.co")).toBe(true);
+    expect(_consumeForgotQuotaForTests("a@b.co")).toBe(true);
+    expect(_consumeForgotQuotaForTests("a@b.co")).toBe(true);
+    expect(_consumeForgotQuotaForTests("a@b.co")).toBe(false);
+    expect(_consumeForgotQuotaForTests("a@b.co")).toBe(false);
+  });
+
+  it("limits each email independently — a saturated address doesn't block others", () => {
+    for (let i = 0; i < 3; i++) {
+      expect(_consumeForgotQuotaForTests("victim@x.com")).toBe(true);
+    }
+    expect(_consumeForgotQuotaForTests("victim@x.com")).toBe(false);
+    // Different email is unaffected
+    expect(_consumeForgotQuotaForTests("someone-else@x.com")).toBe(true);
   });
 });
 

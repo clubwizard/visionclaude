@@ -7,6 +7,8 @@ import type {
   ServerConfig,
   ToolCallResult,
 } from "./types.js";
+import { getSuccessor, isModelDeprecationError } from "./model-registry.js";
+import { c } from "./console-theme.js";
 
 const MAX_TOOL_ITERATIONS = 10;
 
@@ -38,6 +40,57 @@ export class ClaudeClient {
       this.clients.set(apiKey, client);
     }
     return client;
+  }
+
+  // Wraps messages.create with one-shot deprecation recovery. On a model-
+  // deprecation error, retries against the latest model in the same family
+  // and hot-patches this.config.model so subsequent calls skip the retry.
+  // We pay the retry cost ONCE per server lifetime, then steady state.
+  // Any other error (rate limit, auth, network) propagates unchanged.
+  private async callWithDeprecationRetry(
+    anthropic: Anthropic,
+    params: Omit<Parameters<typeof anthropic.messages.create>[0], "model">
+  ): Promise<Anthropic.Message> {
+    const current = this.config.model;
+    try {
+      return (await anthropic.messages.create({
+        ...params,
+        model: current,
+      })) as Anthropic.Message;
+    } catch (err) {
+      if (!isModelDeprecationError(err)) throw err;
+      const successor = getSuccessor(current);
+      if (successor === current) {
+        // Already on the latest known model — nothing we can do but
+        // re-throw and let the operator know the registry is stale.
+        console.error(
+          c.error(
+            `[Model] "${current}" looks deprecated, but our registry has no successor for it. ` +
+              `Update LATEST_PER_FAMILY in src/model-registry.ts.`
+          )
+        );
+        throw err;
+      }
+      console.log(
+        c.warn(
+          `[Model] "${current}" returned a deprecation error — retrying once with "${successor}".`
+        )
+      );
+      console.log(
+        c.dim(
+          `   Set CLAUDE_MODEL=${successor} in .env to pin permanently and skip this fallback.`
+        )
+      );
+      const response = (await anthropic.messages.create({
+        ...params,
+        model: successor,
+      })) as Anthropic.Message;
+      // Hot-patch so the rest of the server's lifetime uses the working
+      // model directly. Next operator restart, the env-var pin (or lack
+      // thereof) takes effect again.
+      this.config.model = successor;
+      return response;
+    }
   }
 
   async chat(
@@ -91,8 +144,7 @@ export class ClaudeClient {
     let outputTokens = 0;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      const response = await anthropic.messages.create({
-        model: this.config.model,
+      const response = await this.callWithDeprecationRetry(anthropic, {
         max_tokens: this.config.maxTokens,
         system: this.config.systemPrompt,
         messages: currentMessages,

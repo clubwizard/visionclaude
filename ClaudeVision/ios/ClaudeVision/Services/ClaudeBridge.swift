@@ -20,6 +20,17 @@ class ClaudeBridge: NSObject, ObservableObject, URLSessionWebSocketDelegate {
     var onStatus: ((String) -> Void)?
     var onThinking: ((String) -> Void)?
     var onDisconnect: (() -> Void)?
+    /// Cowork pull-pattern: server asks for a fresh camera snapshot.
+    /// The host (SessionViewModel) should capture a frame from the
+    /// active source and call `fulfilSnapshot(requestId:image:source:)`.
+    /// Args: (requestId, source: "iphone" or "rayban", prompt?)
+    var onSnapshotRequest: ((String, String, String?) -> Void)?
+    /// Cowork pull-pattern: server asks the user a clarifying question.
+    /// The host should start STT, then call `fulfilVoice(requestId:text:)`
+    /// with the transcribed reply. The prompt is already spoken via the
+    /// reply callback that accompanies this message.
+    /// Args: (requestId, prompt, timeoutMs)
+    var onVoiceRequest: ((String, String, Int) -> Void)?
 
     private var webSocket: URLSessionWebSocketTask?
     private var urlSession: URLSession?
@@ -130,6 +141,28 @@ class ClaudeBridge: NSObject, ObservableObject, URLSessionWebSocketDelegate {
                 let thinkText = json["text"] as? String ?? ""
                 self.onThinking?(thinkText)
 
+            case "request_snapshot":
+                // Server-initiated pull: capture and upload a fresh image
+                // with this request_id so the agent's get_camera_snapshot
+                // tool call resolves.
+                let requestId = json["request_id"] as? String ?? ""
+                let source = json["source"] as? String ?? "iphone"
+                let prompt = json["prompt"] as? String
+                guard !requestId.isEmpty else { break }
+                print("[Bridge] Snapshot requested: \(requestId) source=\(source)")
+                self.onSnapshotRequest?(requestId, source, prompt)
+
+            case "request_voice":
+                // Server-initiated pull: speak the prompt (the server has
+                // already sent a `reply` message with the audio_url), then
+                // start STT and post the transcript back with this id.
+                let requestId = json["request_id"] as? String ?? ""
+                let prompt = json["prompt"] as? String ?? ""
+                let timeoutMs = json["timeout_ms"] as? Int ?? 30000
+                guard !requestId.isEmpty else { break }
+                print("[Bridge] Voice input requested: \(requestId) prompt=\"\(prompt.prefix(40))…\"")
+                self.onVoiceRequest?(requestId, prompt, timeoutMs)
+
             default:
                 break
             }
@@ -204,6 +237,75 @@ class ClaudeBridge: NSObject, ObservableObject, URLSessionWebSocketDelegate {
             throw ClaudeBridgeError.serverError(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0, message: "Upload failed")
         }
         print("[Bridge] Uploaded \(source) image (\(image.count / 1024)KB)")
+    }
+
+    // MARK: - Cowork pull-pattern fulfilment
+
+    /// Send a snapshot back to the channel server tagged with the request_id
+    /// from the matching `request_snapshot` message. Resolves the agent's
+    /// `get_camera_snapshot` MCP tool call.
+    func fulfilSnapshot(requestId: String, image: Data, source: String = "iphone") async throws {
+        let url = URL(string: "http://\(config.gatewayHost):\(config.gatewayPort)/upload")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        if !config.channelToken.isEmpty {
+            request.setValue("Bearer \(config.channelToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        let boundary = "VisionClaude-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        let fields: [(String, String)] = [
+            ("id", "ios-snap-\(Date().timeIntervalSince1970)"),
+            ("source", source),
+            ("request_id", requestId),
+        ]
+        for (key, value) in fields {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(value)\r\n".data(using: .utf8)!)
+        }
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"snapshot.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(image)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        request.httpBody = body
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 204 else {
+            throw ClaudeBridgeError.serverError(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0, message: "Snapshot fulfilment failed")
+        }
+        print("[Bridge] Fulfilled snapshot \(requestId) (\(image.count / 1024)KB)")
+    }
+
+    /// Send a transcribed voice reply tagged with the request_id from the
+    /// matching `request_voice` message. Resolves the agent's
+    /// `request_voice_input` MCP tool call.
+    func fulfilVoice(requestId: String, text: String, source: String = "iphone") async throws {
+        let url = URL(string: "http://\(config.gatewayHost):\(config.gatewayPort)/message")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !config.channelToken.isEmpty {
+            request.setValue("Bearer \(config.channelToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        let payload: [String: Any] = [
+            "request_id": requestId,
+            "text": text,
+            "source": source,
+            "id": "ios-voice-\(Date().timeIntervalSince1970)",
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw ClaudeBridgeError.serverError(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0, message: "Voice fulfilment failed")
+        }
+        print("[Bridge] Fulfilled voice \(requestId): \"\(text.prefix(60))\"")
     }
 
     // MARK: - Gateway Mode (REST fallback)
