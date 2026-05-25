@@ -11,7 +11,10 @@ import {
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // MEDIUM: Validate email format server-side before any DB operation.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Intentionally stricter than RFC 5322 — rejects punctuation that's legal
+// in theory (angle brackets, quotes, parens, slashes) but never seen in
+// real user-typed addresses and frequently part of injection attempts.
+const EMAIL_RE = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
 export function isValidEmail(email: string): boolean {
   return typeof email === "string" && email.length <= 254 && EMAIL_RE.test(email);
 }
@@ -334,6 +337,11 @@ export function signupWithInvite(
   );
 
   const run = db.transaction(() => {
+    // INSERT user first so invites.used_by FK is satisfied. Two concurrent
+    // signups racing on the same token both INSERT, but only one wins the
+    // claimInvite UPDATE (changes=1 — the other gets changes=0, throws,
+    // and the entire transaction rolls back — user row included).
+    insertUser.run(userId, normalizedEmail, passwordHash, now);
     const r = claimInvite.run(userId, now, token, now);
     if (r.changes === 0) {
       // Sentinel — caught below and translated to a structured result.
@@ -341,7 +349,6 @@ export function signupWithInvite(
       (e as Error & { code?: string }).code = "INVALID_INVITE";
       throw e;
     }
-    insertUser.run(userId, normalizedEmail, passwordHash, now);
   });
 
   try {

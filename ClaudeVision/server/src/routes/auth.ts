@@ -18,10 +18,9 @@ export function createAuthRouter(): Router {
       res.status(400).json({ error: "email and password are required" });
       return;
     }
-    if (!isValidEmail(email)) {
-      res.status(401).json({ error: "Incorrect email or password" });
-      return;
-    }
+    // No format validation here on purpose — login must accept any email
+    // that was accepted at signup, even after we tighten EMAIL_RE later.
+    // authenticate() returns null for unknown emails anyway, producing 401.
     const user = authenticate(email, password);
     if (!user) {
       res.status(401).json({ error: "Incorrect email or password" });
