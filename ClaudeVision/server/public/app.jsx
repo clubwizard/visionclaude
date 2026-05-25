@@ -510,13 +510,15 @@ const Footer = ({ p }) => (
 // Login modal (interactive)
 // ───────────────────────────────────────────────────────────────
 const LoginModal = ({ open, onClose, p, accent }) => {
+  // mode: "login" → email+password, "forgot" → email only, "sent" → confirmation
+  const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!open) { setEmail(""); setPassword(""); setError(""); setLoading(false); }
+    if (!open) { setMode("login"); setEmail(""); setPassword(""); setError(""); setLoading(false); }
   }, [open]);
 
   if (!open) return null;
@@ -544,6 +546,37 @@ const LoginModal = ({ open, onClose, p, accent }) => {
     }
   };
 
+  const submitForgot = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      // Endpoint always returns 200 unless rate-limited or missing email.
+      if (res.ok) {
+        setMode("sent");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data?.error || "Something went wrong. Try again.");
+      }
+    } catch {
+      setError("Connection error. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const labelStyle = { fontFamily: "ui-monospace, monospace", fontSize: 10, letterSpacing: "0.1em", color: p.muted, textTransform: "uppercase" };
+  const inputBase = (mb = 0) => ({
+    width: "100%", marginTop: 6, marginBottom: mb, padding: "14px 16px", borderRadius: 10,
+    border: `1px solid ${error ? "#e05" : p.line}`, background: p.panel, color: p.ink,
+    fontFamily: "'Inter Tight', sans-serif", fontSize: 16, outline: "none", boxSizing: "border-box"
+  });
+
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, background: `${p.ink}aa`, backdropFilter: "blur(6px)",
@@ -560,42 +593,94 @@ const LoginModal = ({ open, onClose, p, accent }) => {
           color: p.muted, fontSize: 22, cursor: "pointer", padding: 4, lineHeight: 1
         }}>×</button>
         <Aperture size={28} color={accent} />
-        <h3 style={{ fontFamily: "var(--display-font)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.02em", color: p.ink, margin: "16px 0 8px", lineHeight: 1.05 }}>
-          Log in to <em>Aside</em>.
-        </h3>
-        <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 14, color: p.muted, lineHeight: 1.5, margin: "0 0 28px" }}>
-          Sign in with your account email and password. New here? You'll need an invite from an admin.
-        </p>
-        <form onSubmit={submit}>
-          <label style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, letterSpacing: "0.1em", color: p.muted, textTransform: "uppercase" }}>
-            Email
-          </label>
-          <input
-            autoFocus type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)}
-            style={{
-              width: "100%", marginTop: 6, marginBottom: 14, padding: "14px 16px", borderRadius: 10,
-              border: `1px solid ${error ? "#e05" : p.line}`, background: p.panel, color: p.ink,
-              fontFamily: "'Inter Tight', sans-serif", fontSize: 16, outline: "none", boxSizing: "border-box"
-            }} />
-          <label style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, letterSpacing: "0.1em", color: p.muted, textTransform: "uppercase" }}>
-            Password
-          </label>
-          <input
-            type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)}
-            style={{
-              width: "100%", marginTop: 6, padding: "14px 16px", borderRadius: 10,
-              border: `1px solid ${error ? "#e05" : p.line}`, background: p.panel, color: p.ink,
-              fontFamily: "'Inter Tight', sans-serif", fontSize: 16, outline: "none", boxSizing: "border-box"
-            }} />
-          {error && <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 13, color: "#e05", margin: "8px 0 0" }}>{error}</p>}
-          <button type="submit" disabled={loading || !email || !password} style={{
-            marginTop: 16, width: "100%", padding: "14px", borderRadius: 10, border: "none",
-            background: accent, color: p.ink, fontFamily: "'Inter Tight', sans-serif", fontSize: 15, fontWeight: 500,
-            cursor: loading ? "wait" : "pointer", opacity: (!email || !password) ? 0.5 : 1
-          }}>
-            {loading ? "Checking…" : "Log in →"}
-          </button>
-        </form>
+
+        {mode === "login" && (
+          <>
+            <h3 style={{ fontFamily: "var(--display-font)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.02em", color: p.ink, margin: "16px 0 8px", lineHeight: 1.05 }}>
+              Log in to <em>Aside</em>.
+            </h3>
+            <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 14, color: p.muted, lineHeight: 1.5, margin: "0 0 28px" }}>
+              Sign in with your account email and password. New here? You'll need an invite from an admin.
+            </p>
+            <form onSubmit={submit}>
+              <label style={labelStyle}>Email</label>
+              <input
+                autoFocus type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)}
+                style={inputBase(14)} />
+              <label style={labelStyle}>Password</label>
+              <input
+                type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)}
+                style={inputBase()} />
+              {error && <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 13, color: "#e05", margin: "8px 0 0" }}>{error}</p>}
+              <button type="submit" disabled={loading || !email || !password} style={{
+                marginTop: 16, width: "100%", padding: "14px", borderRadius: 10, border: "none",
+                background: accent, color: p.ink, fontFamily: "'Inter Tight', sans-serif", fontSize: 15, fontWeight: 500,
+                cursor: loading ? "wait" : "pointer", opacity: (!email || !password) ? 0.5 : 1
+              }}>
+                {loading ? "Checking…" : "Log in →"}
+              </button>
+            </form>
+            <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 13, color: p.muted, margin: "16px 0 0", textAlign: "center" }}>
+              <a
+                href="#"
+                onClick={e => { e.preventDefault(); setError(""); setMode("forgot"); }}
+                style={{ color: p.muted, textDecoration: "underline", cursor: "pointer" }}
+              >Forgot your password?</a>
+            </p>
+          </>
+        )}
+
+        {mode === "forgot" && (
+          <>
+            <h3 style={{ fontFamily: "var(--display-font)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.02em", color: p.ink, margin: "16px 0 8px", lineHeight: 1.05 }}>
+              Reset password
+            </h3>
+            <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 14, color: p.muted, lineHeight: 1.5, margin: "0 0 28px" }}>
+              Enter your account email. If it's registered, we'll send a single-use reset link that's good for one hour.
+            </p>
+            <form onSubmit={submitForgot}>
+              <label style={labelStyle}>Email</label>
+              <input
+                autoFocus type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)}
+                style={inputBase()} />
+              {error && <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 13, color: "#e05", margin: "8px 0 0" }}>{error}</p>}
+              <button type="submit" disabled={loading || !email} style={{
+                marginTop: 16, width: "100%", padding: "14px", borderRadius: 10, border: "none",
+                background: accent, color: p.ink, fontFamily: "'Inter Tight', sans-serif", fontSize: 15, fontWeight: 500,
+                cursor: loading ? "wait" : "pointer", opacity: !email ? 0.5 : 1
+              }}>
+                {loading ? "Sending…" : "Send reset link"}
+              </button>
+            </form>
+            <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 13, color: p.muted, margin: "16px 0 0", textAlign: "center" }}>
+              <a
+                href="#"
+                onClick={e => { e.preventDefault(); setError(""); setMode("login"); }}
+                style={{ color: p.muted, textDecoration: "underline", cursor: "pointer" }}
+              >← Back to login</a>
+            </p>
+          </>
+        )}
+
+        {mode === "sent" && (
+          <>
+            <h3 style={{ fontFamily: "var(--display-font)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.02em", color: p.ink, margin: "16px 0 8px", lineHeight: 1.05 }}>
+              Check your inbox
+            </h3>
+            <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 14, color: p.muted, lineHeight: 1.5, margin: "0 0 28px" }}>
+              If <strong style={{ color: p.ink }}>{email}</strong> is registered, a reset link is on its way. The link expires after one hour and can only be used once.
+            </p>
+            <button
+              onClick={() => { setMode("login"); setPassword(""); }}
+              style={{
+                width: "100%", padding: "14px", borderRadius: 10, border: "none",
+                background: accent, color: p.ink, fontFamily: "'Inter Tight', sans-serif", fontSize: 15, fontWeight: 500,
+                cursor: "pointer"
+              }}>
+              Back to login
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,12 +1,28 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import {
   authenticate,
   findUserById,
+  findUserByEmail,
   countUsers,
   getUserKeyStatus,
   signupWithInvite,
   isValidEmail,
+  createPasswordResetToken,
+  consumePasswordResetToken,
+  isPasswordResetTokenValid,
 } from "../users.js";
+import { sendPasswordResetEmail } from "../postmark.js";
+
+// Reset URL base. Prefers PUBLIC_BASE_URL (set this on prod behind Nginx
+// so the link is always https://your-domain regardless of which Host
+// header the request came in with). Falls back to req.protocol + Host
+// when unset — works for local dev. `trust proxy = 1` in index.ts makes
+// req.protocol respect X-Forwarded-Proto.
+function buildResetUrl(req: Request, rawToken: string): string {
+  const base = process.env.PUBLIC_BASE_URL?.trim().replace(/\/$/, "");
+  if (base) return `${base}/reset-password?token=${rawToken}`;
+  return `${req.protocol}://${req.get("host")}/reset-password?token=${rawToken}`;
+}
 
 export function createAuthRouter(): Router {
   const router = Router();
@@ -159,6 +175,87 @@ export function createAuthRouter(): Router {
   // "no admin yet, set BOOTSTRAP_ADMIN_* on the host" if the system is fresh.
   router.get("/status", (_req, res) => {
     res.json({ userCount: countUsers() });
+  });
+
+  // POST /auth/forgot-password — { email } → 200 always (no enumeration).
+  // If the email maps to a real user, mints a reset token, persists its
+  // sha256, and sends the raw token via Postmark. The 5/min/IP cap on the
+  // /auth router covers brute force; failures (Postmark errors, missing
+  // user) are logged server-side but invisible to the caller.
+  router.post("/forgot-password", async (req, res) => {
+    const { email } = req.body as { email?: unknown };
+    if (typeof email !== "string" || !email) {
+      res.status(400).json({ error: "email is required" });
+      return;
+    }
+    const generic = { ok: true };
+    // Same shape regardless of outcome — never tell the client whether
+    // the email existed, whether Postmark accepted it, or whether the
+    // address was malformed past basic type checks.
+    if (!isValidEmail(email)) {
+      res.json(generic);
+      return;
+    }
+    const userRow = findUserByEmail(email);
+    if (!userRow) {
+      res.json(generic);
+      return;
+    }
+    try {
+      const { rawToken } = createPasswordResetToken(userRow.id);
+      const url = buildResetUrl(req, rawToken);
+      // Fire and await so a Postmark outage shows up in logs synchronously
+      // with the request, but the client always sees the same response.
+      await sendPasswordResetEmail(userRow.email, url);
+    } catch (err) {
+      console.error("[forgot-password] internal error:", err);
+    }
+    res.json(generic);
+  });
+
+  // GET /auth/reset-password/check?token=... — does this token still let
+  // the user set a password? Returns { valid: bool } only, no email.
+  router.get("/reset-password/check", (req, res) => {
+    const token = req.query.token;
+    if (typeof token !== "string") {
+      res.json({ valid: false });
+      return;
+    }
+    res.json({ valid: isPasswordResetTokenValid(token) });
+  });
+
+  // POST /auth/reset-password — { token, password } → consumes the
+  // token atomically (single-use) and updates password_hash. Does NOT
+  // log the user in — they get bounced back to the login form so they
+  // confirm the new password works.
+  router.post("/reset-password", (req, res) => {
+    const { token, password } = req.body as {
+      token?: unknown;
+      password?: unknown;
+    };
+    if (
+      typeof token !== "string" ||
+      typeof password !== "string" ||
+      !token ||
+      !password
+    ) {
+      res.status(400).json({ error: "token and password are required" });
+      return;
+    }
+    if (password.length < 8) {
+      res
+        .status(400)
+        .json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+    const result = consumePasswordResetToken(token, password);
+    if (!result.ok) {
+      res
+        .status(400)
+        .json({ error: "This reset link has expired or already been used." });
+      return;
+    }
+    res.json({ ok: true });
   });
 
   return router;
