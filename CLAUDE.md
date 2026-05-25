@@ -81,8 +81,12 @@ For a CLI fallback when email is unavailable, `dist/reset-password.js` (run via 
 
 ### Channel mode (`ClaudeVision/channel/server.ts`)
 One big Bun file. Two surfaces:
-- An MCP `Server` over `StdioServerTransport` exposing `reply` and `edit_message` tools that Claude Code calls to talk back to the phone.
+- An MCP `Server` over `StdioServerTransport` exposing four tools:
+  - `reply` / `edit_message` — push-style. Phone sends a message, agent reads it via the channel notification, replies through `reply`.
+  - `get_camera_snapshot` / `request_voice_input` — pull-style ("Cowork connector pattern"). Mid-task the agent calls these to ask the phone for a fresh image or one short utterance. Implemented as a WS message → phone fulfils via `/upload` or `/message` with the matching `request_id` → MCP tool resolves with the result inline. Pending requests live in a Map with per-call timeouts (default 15s for snapshot, 30s for voice; capped at 60s/120s).
 - A `Bun.serve` HTTP+WebSocket server on `0.0.0.0:18790` that the iOS app connects to. Token auth via `Bearer` header or `?token=` — the token is generated on first run and persisted to `~/.claude/channels/visionclaude/.channel-token` (mode `0600`). Override with `VISIONCLAUDE_TOKEN`.
+
+The pull-pattern is what makes VisionClaude a useful **Cowork connector**: drop the same server into `claude_desktop_config.json` and Anthropic's desktop agent gains wearable eyes + ears. iOS handlers live in `ClaudeBridge.handleWebSocketMessage` (`request_snapshot` / `request_voice` cases) and `SessionViewModel.setupBridgeCallbacks` (snapshot wired to `latestFrame` from the active source; voice is a TODO — see the comment, needs SpeechManager work to be a one-shot recogniser).
 
 State lives in `~/.claude/channels/visionclaude/`: `inbox/` for phone-uploaded images, `outbox/` for files Claude pushes back, `.env` for the ElevenLabs key, `.channel-token` for the shared secret. Activity log is capped at 50 entries in memory.
 

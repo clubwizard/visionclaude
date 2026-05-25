@@ -68,7 +68,9 @@ The interactive installer handles dependencies, API keys, and Xcode project gene
 
 ### Step 2: Start the Channel
 
-Add VisionClaude as an MCP server in your project's `.mcp.json`:
+VisionClaude registers as an MCP server with **both** Claude Code (`.mcp.json`) and Claude Desktop / **Cowork** (`claude_desktop_config.json`). Same server, same tools — pick whichever surface you use.
+
+**For Claude Code** (`.mcp.json` in your project root):
 
 ```json
 {
@@ -81,11 +83,26 @@ Add VisionClaude as an MCP server in your project's `.mcp.json`:
 }
 ```
 
-Then launch Claude Code with the channel enabled:
+Launch with the channel enabled:
 
 ```bash
 claude --dangerously-load-development-channels "server:visionclaude"
 ```
+
+**For Claude Desktop / Cowork** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "visionclaude": {
+      "command": "bun",
+      "args": ["run", "/path/to/visionclaude/ClaudeVision/channel/server.ts"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop. The agent now sees four VisionClaude tools — `reply`, `edit_message`, `get_camera_snapshot`, `request_voice_input` — and can use the phone (or Ray-Ban glasses) as eyes and ears during a Cowork task. Pair your phone with Cowork via **Dispatch** (QR code from the Anthropic mobile app) and your wearable becomes a sensor for whatever Cowork is doing on the desktop.
 
 ### Step 3: Get Your Token
 
