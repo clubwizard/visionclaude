@@ -29,7 +29,7 @@ export function createMeRouter(): Router {
 
   // PUT key(s) — pass null/empty string to clear a slot
   router.put("/api-keys", (req, res) => {
-    const body = req.body as { anthropic?: string | null; deepgram?: string | null };
+    const body = req.body as { anthropic?: string | null; deepgram?: string | null; openai?: string | null };
     const userId = req.session.userId!;
     const updates: KeySlot[] = [];
     if (body.anthropic !== undefined) {
@@ -39,6 +39,10 @@ export function createMeRouter(): Router {
     if (body.deepgram !== undefined) {
       setUserApiKey(userId, "deepgram", body.deepgram ?? null);
       updates.push("deepgram");
+    }
+    if (body.openai !== undefined) {
+      setUserApiKey(userId, "openai", body.openai ?? null);
+      updates.push("openai");
     }
     res.json({ ok: true, updated: updates, keys: getUserKeyStatus(userId) });
   });
