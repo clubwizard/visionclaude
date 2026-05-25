@@ -217,7 +217,7 @@ async function main() {
   app.use(rateLimiter(30));
 
   // ── User self-service: /me/api-keys etc. ──
-  app.use("/me", createMeRouter());
+  app.use("/me", createMeRouter(mcpManager, skillLoader));
 
   // ── Admin: invites + user list ──
   app.use("/admin", createAdminRouter());

@@ -16,6 +16,20 @@
       font-family: 'Inter Tight', sans-serif;
       color: #1A1714;
     }
+    /* iOS status bar covers content as the page scrolls. Paint a solid
+       strip in the safe-area zone so scrolled content disappears behind
+       the page background instead of fighting the OS-drawn clock/battery. */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: env(safe-area-inset-top);
+      background: #F4EFE5;
+      z-index: 10;
+      pointer-events: none;
+    }
     .wrap { max-width: 640px; margin: 0 auto; }
     h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 40px; letter-spacing: -0.02em; margin-bottom: 6px; }
     .me { color: #7B7468; font-size: 13px; margin-bottom: 28px; }
@@ -32,10 +46,14 @@
     .pill.set { background: #DDF7E5; color: #2F8A57; }
     .pill.unset { background: #FFE6D3; color: #C25A2B; }
     .pill.env { background: #E3ECFE; color: #3B5BBF; }
-    .row { display: flex; gap: 8px; align-items: stretch; }
-    .row input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #D9D1C0; background: #FFFDF8; font-size: 14px; font-family: inherit; }
+    .row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+    .row input { flex: 1 1 100%; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid #D9D1C0; background: #FFFDF8; font-size: 14px; font-family: inherit; }
     .row input:focus { outline: 2px solid #6FE3A8; outline-offset: 1px; }
-    .row button { padding: 10px 13px; border: 1px solid #D9D1C0; background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; font-family: inherit; color: #1A1714; }
+    .row button { flex: 0 0 auto; padding: 10px 13px; border: 1px solid #D9D1C0; background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; font-family: inherit; color: #1A1714; }
+    /* On wider viewports, let the input share a row with the buttons */
+    @media (min-width: 520px) {
+      .row input { flex: 1 1 0; }
+    }
     .row button:hover { filter: brightness(0.96); }
     .row button.primary { background: #6FE3A8; border-color: #6FE3A8; font-weight: 500; }
     .row button.test { background: #fff; color: #3B5BBF; border-color: #C7D2EE; }
@@ -75,6 +93,18 @@
     .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
     .logout { background: transparent; border: 1px solid #D9D1C0; color: #7B7468; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-family: inherit; cursor: pointer; }
     .new-invite-btn { padding: 10px 16px; border-radius: 9px; border: 1px solid #6FE3A8; background: #6FE3A8; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
+    .mcp-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .mcp-info-cell { padding: 14px 16px; background: #FAF6EC; border-radius: 10px; }
+    .mcp-info-label { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #7B7468; margin-bottom: 6px; }
+    .mcp-info-value { font-family: 'Instrument Serif', serif; font-size: 28px; line-height: 1; color: #1A1714; margin-bottom: 8px; }
+    .mcp-info-detail { font-size: 12px; color: #7B7468; line-height: 1.45; word-break: break-word; }
+    .mcp-info-config { font-size: 11px; color: #7B7468; padding: 10px 12px; background: #FAF6EC; border-radius: 8px; word-break: break-all; }
+    .mcp-info-config code { font-family: ui-monospace, monospace; color: #4A4540; }
     .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1A1714; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity 0.2s; }
     .toast.show { opacity: 1; }
     .links { font-size: 13px; color: #7B7468; }
@@ -142,6 +172,34 @@
       </div>
     </div>
 
+    <div class="card" id="mcp-info-card">
+      <h2>Cowork & MCP</h2>
+      <div class="hint">
+        VisionClaude's Channel server registers as an MCP server so Claude Desktop's <strong>Cowork</strong> mode (and Claude Code) can pull camera snapshots and voice replies from your phone mid-task.
+        <a href="https://github.com/clubwizard/visionclaude/blob/main/ClaudeVision/docs/CLAUDE_DESKTOP_SETUP.md" target="_blank" rel="noopener">Set up Claude Desktop &rarr;</a>
+      </div>
+      <div id="mcp-info-body" class="mcp-info-grid">
+        <div class="mcp-info-cell">
+          <div class="mcp-info-label">MCP servers loaded</div>
+          <div class="mcp-info-value" id="mcp-server-count">—</div>
+          <div class="mcp-info-detail" id="mcp-server-list">Loading…</div>
+        </div>
+        <div class="mcp-info-cell">
+          <div class="mcp-info-label">Tools exposed</div>
+          <div class="mcp-info-value" id="mcp-tool-count">—</div>
+          <div class="mcp-info-detail">across all servers</div>
+        </div>
+        <div class="mcp-info-cell">
+          <div class="mcp-info-label">Skills loaded</div>
+          <div class="mcp-info-value" id="mcp-skill-count">—</div>
+          <div class="mcp-info-detail" id="mcp-skill-list">Loading…</div>
+        </div>
+      </div>
+      <div class="mcp-info-config" id="mcp-config-path">
+        Config: <code>—</code>
+      </div>
+    </div>
+
     <div class="card" id="admin-invites-card" hidden>
       <h2>Invites</h2>
       <div class="hint">Mint a one-time link and share it with the new user. Each link expires in 7 days and can only be used once.</div>
@@ -196,6 +254,10 @@
         loadInvites();
         loadUsers();
       }
+      // Fire-and-forget — the MCP card is informational and doesn't gate
+      // any other interaction. If the endpoint errors we just leave the
+      // placeholder dashes in place.
+      loadMcpInfo();
       if (new URLSearchParams(location.search).get('welcome')) {
         toast('Welcome to Aside. Add your keys below to start.');
       }
@@ -296,6 +358,51 @@
                               <button data-token="${safeToken}" data-action="revoke">Revoke</button>`}
         `;
         list.appendChild(row);
+      }
+    }
+
+    async function loadMcpInfo() {
+      try {
+        const res = await fetch('/me/mcp-info');
+        if (!res.ok) return;
+        const data = await res.json();
+        // Counts — use textContent on the spans, not innerHTML
+        $('mcp-server-count').textContent = data.servers?.length ?? 0;
+        $('mcp-tool-count').textContent = data.totalTools ?? 0;
+        $('mcp-skill-count').textContent = data.skills?.length ?? 0;
+
+        // Server list — names + per-server tool count, or a helpful empty state
+        const serverList = $('mcp-server-list');
+        serverList.textContent = '';
+        if (data.servers?.length) {
+          for (const s of data.servers) {
+            const line = document.createElement('div');
+            line.textContent = `${s.name} — ${s.toolCount} tool${s.toolCount === 1 ? '' : 's'}`;
+            serverList.appendChild(line);
+          }
+        } else {
+          serverList.textContent = 'None — see the setup guide above to add VisionClaude to Claude Desktop or Claude Code.';
+        }
+
+        // Skill names (truncated list — full list is in /skills)
+        const skillList = $('mcp-skill-list');
+        skillList.textContent = '';
+        if (data.skills?.length) {
+          const names = data.skills.slice(0, 4).map(s => s.name).join(', ');
+          const extra = data.skills.length > 4 ? `, +${data.skills.length - 4} more` : '';
+          skillList.textContent = names + extra;
+        } else {
+          skillList.textContent = 'No skills loaded yet.';
+        }
+
+        // Config path — show under a <code> child built via textContent
+        const cfg = $('mcp-config-path');
+        cfg.textContent = 'Config: ';
+        const code = document.createElement('code');
+        code.textContent = data.configPath || '(default)';
+        cfg.appendChild(code);
+      } catch {
+        // Leave placeholders in place — non-fatal
       }
     }
 

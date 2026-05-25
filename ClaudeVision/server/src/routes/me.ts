@@ -7,8 +7,13 @@ import {
   type KeySlot,
 } from "../users.js";
 import { requireAuth } from "../middleware.js";
+import type { MCPManager } from "../mcp-manager.js";
+import type { SkillLoader } from "../skill-loader.js";
 
-export function createMeRouter(): Router {
+export function createMeRouter(
+  mcpManager: MCPManager,
+  skillLoader: SkillLoader
+): Router {
   const router = Router();
   router.use(requireAuth);
 
@@ -45,6 +50,30 @@ export function createMeRouter(): Router {
       updates.push("openai");
     }
     res.json({ ok: true, updated: updates, keys: getUserKeyStatus(userId) });
+  });
+
+  // GET /me/mcp-info — read-only view of what MCP servers and skills
+  // this Gateway has loaded, plus a pointer to the Claude Desktop setup
+  // guide. Not sensitive (no auth tokens, no env values) — just the
+  // info a user needs to verify their Cowork-connector setup is wired up.
+  router.get("/mcp-info", (_req, res) => {
+    const servers = mcpManager.getServerStatus(); // [{name, toolCount, type}]
+    const skills = skillLoader.getSkillList();    // [{name, description, trigger}]
+    const totalTools = servers.reduce((sum, s) => sum + s.toolCount, 0);
+    res.json({
+      configPath: process.env.MCP_CONFIG_PATH || "(default: ~/Library/Application Support/Claude/claude_desktop_config.json)",
+      servers,
+      totalTools,
+      skills,
+      // Static doc URLs — point at the canonical GitHub copies so they
+      // stay live even on a stale Gateway deploy.
+      docs: {
+        coworkSetup:
+          "https://github.com/clubwizard/visionclaude/blob/main/ClaudeVision/docs/CLAUDE_DESKTOP_SETUP.md",
+        helpGuide:
+          "https://github.com/clubwizard/visionclaude/blob/main/ClaudeVision/docs/HELP.md",
+      },
+    });
   });
 
   // POST /me/api-keys/test — verify a key actually works against the
