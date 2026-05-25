@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { c } from "./console-theme.js";
+import { findUserById } from "./users.js";
 
 // Extend express-session with our custom fields
 declare module "express-session" {
@@ -188,10 +189,18 @@ export function requireAnyAuth(req: Request, res: Response, next: NextFunction):
 
 // ── Admin Auth Middleware ────────────────────────────────────────────
 
+// Re-queries the DB on every admin request so revoked admin sessions are
+// rejected immediately rather than waiting for the 24-hour cookie to expire.
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  if (req.session?.userId && req.session?.isAdmin) {
-    next();
+  if (!req.session?.userId) {
+    res.status(403).json({ error: "Admin only" });
     return;
   }
-  res.status(403).json({ error: "Admin only" });
+  const user = findUserById(req.session.userId);
+  if (!user?.isAdmin) {
+    req.session.isAdmin = false;
+    res.status(403).json({ error: "Admin only" });
+    return;
+  }
+  next();
 }

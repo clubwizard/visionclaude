@@ -287,11 +287,12 @@
       for (const inv of invites) {
         const row = document.createElement('div');
         row.className = 'invite-row' + (inv.used ? ' used' : '');
-        const url = `${location.origin}/signup?token=${inv.token}`;
+        const safeToken = escapeHtml(inv.token);
+        const url = `${location.origin}/signup?token=${safeToken}`;
         row.innerHTML = `
           <code>${inv.used ? '(used) ' : ''}${url}</code>
-          ${inv.used ? '' : `<button data-token="${inv.token}" data-action="copy">Copy</button>
-                              <button data-token="${inv.token}" data-action="revoke">Revoke</button>`}
+          ${inv.used ? '' : `<button data-token="${safeToken}" data-action="copy">Copy</button>
+                              <button data-token="${safeToken}" data-action="revoke">Revoke</button>`}
         `;
         list.appendChild(row);
       }
