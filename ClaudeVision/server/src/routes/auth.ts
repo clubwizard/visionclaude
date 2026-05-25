@@ -13,14 +13,22 @@ export function createAuthRouter(): Router {
 
   // POST /auth/login — { email, password } → sets session.userId
   router.post("/login", (req, res) => {
-    const { email, password } = req.body as { email?: string; password?: string };
-    if (!email || !password) {
+    const { email, password } = req.body as { email?: unknown; password?: unknown };
+    // Runtime type guard — req.body is a cast, not validated. Without
+    // this a request like {"email": {}} reaches authenticate() and
+    // crashes inside email.toLowerCase(). No regex check on purpose:
+    // login must accept any email that was accepted at signup, even
+    // after EMAIL_RE was tightened. authenticate() returns null for
+    // unknown emails anyway, producing the same 401.
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      !email ||
+      !password
+    ) {
       res.status(400).json({ error: "email and password are required" });
       return;
     }
-    // No format validation here on purpose — login must accept any email
-    // that was accepted at signup, even after we tighten EMAIL_RE later.
-    // authenticate() returns null for unknown emails anyway, producing 401.
     const user = authenticate(email, password);
     if (!user) {
       res.status(401).json({ error: "Incorrect email or password" });
@@ -96,11 +104,18 @@ export function createAuthRouter(): Router {
   // Body: { token, email, password }. Body password ≥ 8 chars.
   router.post("/signup", (req, res) => {
     const { token, email, password } = req.body as {
-      token?: string;
-      email?: string;
-      password?: string;
+      token?: unknown;
+      email?: unknown;
+      password?: unknown;
     };
-    if (!token || !email || !password) {
+    if (
+      typeof token !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      !token ||
+      !email ||
+      !password
+    ) {
       res
         .status(400)
         .json({ error: "token, email and password are required" });
