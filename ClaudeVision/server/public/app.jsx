@@ -515,11 +515,21 @@ const LoginModal = ({ open, onClose, p, accent }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  // Set when the server returns 429 on /auth/login so we can render the
+  // "email me a reset link" CTA inline instead of just an error string.
+  const [rateLimited, setRateLimited] = useState(0); // seconds until retry; 0 = not limited
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!open) { setMode("login"); setEmail(""); setPassword(""); setError(""); setLoading(false); }
+    if (!open) { setMode("login"); setEmail(""); setPassword(""); setError(""); setRateLimited(0); setLoading(false); }
   }, [open]);
+
+  // Count down the rate-limit retry so the user sees it tick toward 0.
+  useEffect(() => {
+    if (rateLimited <= 0) return;
+    const t = setInterval(() => setRateLimited(s => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [rateLimited > 0]);
 
   if (!open) return null;
 
@@ -537,7 +547,16 @@ const LoginModal = ({ open, onClose, p, accent }) => {
         window.location.href = "/app";
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data?.error || "Incorrect email or password.");
+        if (res.status === 429) {
+          // Brute-force limit hit. Surface the seconds-until-retry +
+          // offer the email-reset path so the user isn't stuck waiting
+          // and wondering if they actually do remember their password.
+          setRateLimited(data?.retryAfter || 60);
+          setError("");
+        } else {
+          setRateLimited(0);
+          setError(data?.error || "Incorrect email or password.");
+        }
         setLoading(false);
       }
     } catch {
@@ -612,18 +631,37 @@ const LoginModal = ({ open, onClose, p, accent }) => {
                 type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)}
                 style={inputBase()} />
               {error && <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 13, color: "#e05", margin: "8px 0 0" }}>{error}</p>}
-              <button type="submit" disabled={loading || !email || !password} style={{
+              {rateLimited > 0 && (
+                <div style={{
+                  marginTop: 14, padding: "12px 14px", borderRadius: 10,
+                  background: "#FFF1DA", border: `1px solid #E89A6B`,
+                  fontFamily: "'Inter Tight', sans-serif", fontSize: 13, color: "#7B5F2A", lineHeight: 1.5
+                }}>
+                  <strong style={{ color: "#1A1714" }}>Too many login attempts.</strong> Wait {rateLimited}s, or get a reset link by email instead:
+                  <button
+                    type="button"
+                    onClick={e => { e.preventDefault(); setError(""); setRateLimited(0); setMode("forgot"); }}
+                    style={{
+                      display: "block", marginTop: 8, padding: "8px 14px", borderRadius: 8,
+                      border: `1px solid #E89A6B`, background: "#fff", color: "#C25A2B",
+                      fontFamily: "'Inter Tight', sans-serif", fontSize: 13, fontWeight: 500, cursor: "pointer"
+                    }}
+                  >Email me a reset link →</button>
+                </div>
+              )}
+              <button type="submit" disabled={loading || !email || !password || rateLimited > 0} style={{
                 marginTop: 16, width: "100%", padding: "14px", borderRadius: 10, border: "none",
                 background: accent, color: p.ink, fontFamily: "'Inter Tight', sans-serif", fontSize: 15, fontWeight: 500,
-                cursor: loading ? "wait" : "pointer", opacity: (!email || !password) ? 0.5 : 1
+                cursor: loading ? "wait" : (rateLimited > 0 ? "not-allowed" : "pointer"),
+                opacity: (!email || !password || rateLimited > 0) ? 0.5 : 1
               }}>
-                {loading ? "Checking…" : "Log in →"}
+                {loading ? "Checking…" : rateLimited > 0 ? `Wait ${rateLimited}s…` : "Log in →"}
               </button>
             </form>
             <p style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 13, color: p.muted, margin: "16px 0 0", textAlign: "center" }}>
               <a
                 href="#"
-                onClick={e => { e.preventDefault(); setError(""); setMode("forgot"); }}
+                onClick={e => { e.preventDefault(); setError(""); setRateLimited(0); setMode("forgot"); }}
                 style={{ color: p.muted, textDecoration: "underline", cursor: "pointer" }}
               >Forgot your password?</a>
             </p>

@@ -10,7 +10,7 @@ import {
   consumePasswordResetToken,
   isPasswordResetTokenValid,
 } from "../users.js";
-import { getAuthenticatedUser } from "../middleware.js";
+import { getAuthenticatedUser, rateLimiter } from "../middleware.js";
 import { sendPasswordResetEmail } from "../postmark.js";
 
 // ── Per-email rate limit for /auth/forgot-password ──────────────────
@@ -85,8 +85,13 @@ function buildResetUrl(req: Request, rawToken: string): string {
 export function createAuthRouter(): Router {
   const router = Router();
 
+  // Brute-force protection on credential endpoints only. Constructed
+  // once per process so all four routes share the same per-IP bucket —
+  // 5 credential attempts per minute, regardless of which endpoint.
+  const credentialLimit = rateLimiter(5, 60_000);
+
   // POST /auth/login — { email, password } → sets session.userId
-  router.post("/login", (req, res) => {
+  router.post("/login", credentialLimit, (req, res) => {
     const { email, password } = req.body as { email?: unknown; password?: unknown };
     // Runtime type guard — req.body is a cast, not validated. Without
     // this a request like {"email": {}} reaches authenticate() and
@@ -177,7 +182,7 @@ export function createAuthRouter(): Router {
 
   // POST /auth/signup — consumes an invite token and creates the user.
   // Body: { token, email, password }. Body password ≥ 8 chars.
-  router.post("/signup", (req, res) => {
+  router.post("/signup", credentialLimit, (req, res) => {
     const { token, email, password } = req.body as {
       token?: unknown;
       email?: unknown;
@@ -242,7 +247,7 @@ export function createAuthRouter(): Router {
   // sha256, and sends the raw token via Postmark. The 5/min/IP cap on the
   // /auth router covers brute force; failures (Postmark errors, missing
   // user) are logged server-side but invisible to the caller.
-  router.post("/forgot-password", async (req, res) => {
+  router.post("/forgot-password", credentialLimit, async (req, res) => {
     const { email } = req.body as { email?: unknown };
     if (typeof email !== "string" || !email) {
       res.status(400).json({ error: "email is required" });
@@ -295,7 +300,7 @@ export function createAuthRouter(): Router {
   // token atomically (single-use) and updates password_hash. Does NOT
   // log the user in — they get bounced back to the login form so they
   // confirm the new password works.
-  router.post("/reset-password", (req, res) => {
+  router.post("/reset-password", credentialLimit, (req, res) => {
     const { token, password } = req.body as {
       token?: unknown;
       password?: unknown;
