@@ -6,6 +6,15 @@ import {
   setUserApiKey,
   type KeySlot,
 } from "../users.js";
+import {
+  createUserMcpServer,
+  listUserMcpServers,
+  getUserMcpServer,
+  getUserMcpServerAuth,
+  setUserMcpServerEnabled,
+  deleteUserMcpServer,
+  validateMcpUrl,
+} from "../user-mcp-servers.js";
 import { requireAuth } from "../middleware.js";
 import type { MCPManager } from "../mcp-manager.js";
 import type { SkillLoader } from "../skill-loader.js";
@@ -74,6 +83,86 @@ export function createMeRouter(
           "https://github.com/clubwizard/visionclaude/blob/main/ClaudeVision/docs/HELP.md",
       },
     });
+  });
+
+  // ── Per-user remote MCP servers ─────────────────────────────────────
+  //
+  // GET    /me/mcp-servers           — list the user's servers (no secrets)
+  // POST   /me/mcp-servers           — add a new server { name, url, authHeader? }
+  // PATCH  /me/mcp-servers/:id       — toggle enabled
+  // DELETE /me/mcp-servers/:id       — remove
+  // POST   /me/mcp-servers/:id/test  — open a probe connection and list tools
+
+  router.get("/mcp-servers", (req, res) => {
+    res.json({ servers: listUserMcpServers(req.session.userId!) });
+  });
+
+  router.post("/mcp-servers", (req, res) => {
+    const body = req.body as { name?: unknown; url?: unknown; authHeader?: unknown };
+    if (typeof body.name !== "string" || typeof body.url !== "string") {
+      res.status(400).json({ error: "name and url are required strings" });
+      return;
+    }
+    if (body.authHeader !== undefined && body.authHeader !== null && typeof body.authHeader !== "string") {
+      res.status(400).json({ error: "authHeader must be a string if provided" });
+      return;
+    }
+    try {
+      const server = createUserMcpServer({
+        userId: req.session.userId!,
+        name: body.name,
+        url: body.url,
+        authHeader: (body.authHeader as string | undefined) ?? null,
+      });
+      res.json({ ok: true, server });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : "Invalid input" });
+    }
+  });
+
+  router.patch("/mcp-servers/:id", (req, res) => {
+    const body = req.body as { enabled?: unknown };
+    if (typeof body.enabled !== "boolean") {
+      res.status(400).json({ error: "enabled must be a boolean" });
+      return;
+    }
+    const ok = setUserMcpServerEnabled(req.session.userId!, req.params.id, body.enabled);
+    if (!ok) {
+      res.status(404).json({ error: "MCP server not found" });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
+  router.delete("/mcp-servers/:id", (req, res) => {
+    const ok = deleteUserMcpServer(req.session.userId!, req.params.id);
+    if (!ok) {
+      res.status(404).json({ error: "MCP server not found" });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
+  // POST /me/mcp-servers/:id/test — probe the upstream server: open a
+  // transient MCP connection, list its tools, close. Surfaces a useful
+  // error message on failure so the user can diagnose without reading
+  // the server logs. Independent of the per-user connection pool used
+  // by /chat (we don't want the test to thrash the pool).
+  router.post("/mcp-servers/:id/test", async (req, res) => {
+    const userId = req.session.userId!;
+    const server = getUserMcpServer(userId, req.params.id);
+    if (!server) {
+      res.status(404).json({ error: "MCP server not found" });
+      return;
+    }
+    const authHeader = getUserMcpServerAuth(userId, req.params.id);
+    try {
+      const tools = await mcpManager.probeRemoteServer(server.url, authHeader);
+      res.json({ ok: true, toolCount: tools.length, toolNames: tools.map(t => t.name).slice(0, 50) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(502).json({ ok: false, error: message });
+    }
   });
 
   // POST /me/api-keys/test — verify a key actually works against the
