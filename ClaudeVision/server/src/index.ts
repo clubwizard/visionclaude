@@ -199,9 +199,13 @@ async function main() {
   app.use(express.static(path.join(__dirname, "../public")));
 
   // ── Public: auth + signup ──
-  // HIGH: Dedicated strict rate limit for auth endpoints (brute-force protection).
-  // Applied before the general 30/min limiter below and independently scoped.
-  app.use("/auth", rateLimiter(5, 60_000));
+  // Brute-force protection (5/min) is applied PER-ROUTE inside the auth
+  // router, not blanket-wrapped here. Earlier this lived on app.use("/auth",
+  // …) which counted every /auth/check read against the same bucket as
+  // /auth/login — five page refreshes locked the user out of their own
+  // session. Now only credential-touching endpoints (login/signup/
+  // forgot-password/reset-password) get the strict cap; cheap reads
+  // (check/status/reset-password/check/logout) fall through.
   app.use("/auth", createAuthRouter());
 
   // ── Public: health ──

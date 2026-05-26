@@ -511,6 +511,10 @@ the actual visible text over inference.</pre>
       <h3>Got logged out unexpectedly</h3>
       <p>If you reset your password on another device, your other sessions are invalidated on their next request. Just log in again — it's by design.</p>
 
+      <h3>"Too many login attempts" / 429 error on login</h3>
+      <p>The login endpoint allows 5 attempts per minute per IP — brute-force protection. If you legitimately hit it (forgot which password you used, typo'd a few times), the login dialog now offers an <em>"Email me a reset link"</em> button inline so you don't have to wait the minute out. If you'd rather wait, the countdown ticks down on the same dialog.</p>
+      <p style="font-size:13px;color:#7B7468">Reading endpoints (page refreshes, session checks) are NOT counted against this limit — only login, signup, forgot-password, and reset-password are. If you find normal navigation locking you out, ask the operator to check the logs.</p>
+
       <h3>Something else</h3>
       <p>Ask the operator of this server. The system administrator has access to server logs and can see what failed.</p>
     </div>
