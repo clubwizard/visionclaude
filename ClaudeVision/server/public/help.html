@@ -134,6 +134,7 @@
         <li><a href="#iphone">iPhone app</a></li>
         <li><a href="#skills">Skills</a></li>
         <li><a href="#mcp">MCP connectors</a></li>
+        <li><a href="#cowork">Claude Desktop &amp; Cowork</a></li>
         <li><a href="#password">Password reset</a></li>
         <li><a href="#trouble">Troubleshooting</a></li>
       </ol>
@@ -212,70 +213,134 @@
 
     <div class="card" id="iphone">
       <h2>iPhone app</h2>
-      <p>There's no App Store build yet. You have three realistic paths to running Aside on your iPhone, easiest first.</p>
+      <p>Three paths to running Aside on your iPhone, easiest first. Pick based on whether you want Meta Ray-Ban support.</p>
 
-      <h3>1. Use the web client as a home-screen app (zero install)</h3>
-      <p>This is what most people should start with. It works today, takes 30 seconds, and exercises the same camera + microphone APIs as the native app.</p>
+      <h3>Path A — web client as a home-screen app (zero install, 30 seconds)</h3>
+      <p>This is what most people should start with. Same camera + microphone APIs as the native app; only Ray-Ban pairing and reliable background audio are unavailable in this mode.</p>
       <ol>
-        <li>Open <code>https://your-aside-domain/app</code> in Safari on your iPhone.</li>
+        <li>Open <code>https://your-aside-domain/app</code> in Safari on your iPhone (must be Safari — Chrome on iOS can't be added to Home Screen).</li>
         <li>Tap the Share icon (square with up-arrow) → <em>Add to Home Screen</em>.</li>
         <li>Name it (<em>Aside</em>) and tap Add. You now have an icon that opens straight into the voice client.</li>
-        <li>First time you tap Talk, Safari asks for microphone permission. Grant it. Same for camera.</li>
+        <li>The first time you tap Talk, Safari prompts for microphone permission. Grant it. Tap the camera icon and grant camera permission too.</li>
+        <li>Log in with your Aside email + password. Done.</li>
       </ol>
       <div class="example">
-        <div class="label">What works</div>
-        Voice in, voice out, camera frames sent to Claude, voice selection, vision toggle, conversation history.
+        <div class="label">What works on the PWA</div>
+        Voice in (Apple's on-device speech recognition), voice out (any provider voice you've configured + browser fallback), camera frame capture, vision toggle, conversation history, voice picker, skills, MCP connectors. Identical to desktop browser experience.
       </div>
       <div class="example">
         <div class="label">What doesn't</div>
-        Meta Ray-Ban glasses pairing (no Web Bluetooth support in iOS Safari) and reliable background audio. If you don't need those, you may never need the native app.
+        Meta Ray-Ban Bluetooth (no Web Bluetooth in iOS Safari). Reliable background audio (Safari pauses audio after ~30 seconds backgrounded). Push notifications.
       </div>
 
-      <h3>2. Build &amp; sideload via Xcode (free, requires a Mac)</h3>
-      <p>For native app + Ray-Ban support, with a free Apple ID. The signed build expires every 7 days; plug your phone back in and rebuild to refresh.</p>
+      <h3>Path B — Build &amp; sideload via Xcode (free, requires a Mac)</h3>
+      <p>Native app for Ray-Ban support and reliable backgrounded audio. With a free Apple ID the signed build expires every 7 days; plug your phone in and rebuild to refresh. Paid Developer account ($99/yr) extends to a year.</p>
+
+      <p><strong>Prerequisites:</strong></p>
+      <ul>
+        <li>macOS 14+ with Xcode 15+ (free from the Mac App Store)</li>
+        <li>An Apple ID (free)</li>
+        <li>iPhone running iOS 17+ with a Lightning or USB-C cable</li>
+        <li><code>xcodegen</code> installed: <code>brew install xcodegen</code></li>
+      </ul>
+
+      <p><strong>Step-by-step:</strong></p>
       <ol>
-        <li>On your Mac, clone the Aside repository if you haven't already.</li>
-        <li>From the repo, regenerate the Xcode project and open it:
+        <li>Clone the Aside repository on your Mac (operator has the URL).</li>
+        <li>Regenerate the Xcode project and open it:
           <pre>cd ClaudeVision/ios
 xcodegen generate
 open ClaudeVision.xcodeproj</pre>
         </li>
-        <li>Plug your iPhone into your Mac via USB. Unlock the phone and tap <em>Trust This Computer</em>.</li>
-        <li>In Xcode's toolbar, select your iPhone in the device dropdown.</li>
-        <li>In <em>Signing &amp; Capabilities</em>, sign in with your Apple ID and pick a unique bundle identifier (e.g. <code>com.yourname.aside</code>).</li>
-        <li>Hit ⌘R. The app installs and launches.</li>
-        <li>First launch on the iPhone: <em>Settings → General → VPN &amp; Device Management → Trust your developer certificate</em>.</li>
+        <li>Plug your iPhone into your Mac via USB. Unlock the phone and tap <em>Trust This Computer</em> on the iPhone prompt.</li>
+        <li>In Xcode's toolbar, select your iPhone in the device dropdown (it appears once Trust is granted).</li>
+        <li>Click the project in the left sidebar → the <em>Aside</em> target → <em>Signing &amp; Capabilities</em>. Click <em>Team</em> → <em>Add an Account</em> → sign in with your Apple ID.</li>
+        <li>Change the <em>Bundle Identifier</em> to something unique — e.g. <code>com.yourname.aside</code>. The default <code>com.aside.app</code> may conflict if someone else built it before you on the same Apple ID.</li>
+        <li>Hit ⌘R. Xcode builds, signs, and installs.</li>
+        <li>On the iPhone the first launch will fail with <em>"Untrusted Developer"</em>. That's expected. Open <em>Settings → General → VPN &amp; Device Management</em>, find your Apple ID under <em>Developer App</em>, tap <em>Trust</em>.</li>
+        <li>Re-launch the app from the Home Screen. It opens.</li>
       </ol>
+
       <div class="callout">
-        With a paid Apple Developer account (US$99/year) the sideload signature lasts a year instead of 7 days, and you don't need to keep plugging in.
+        <strong>Common Xcode build errors:</strong> If you get <em>"No signing certificate"</em>, the bundle identifier you chose is already in use under your Apple ID — change it. If you get <em>"requires a development team"</em>, you haven't set Team in Signing &amp; Capabilities. If you get <em>"could not connect to the iPhone"</em>, unplug and replug the USB cable, then re-trust.
       </div>
 
-      <h3>3. TestFlight (paid, polished, multi-user)</h3>
-      <p>If you have an Apple Developer account, archive the app in Xcode, upload to App Store Connect, invite testers via TestFlight. They install Apple's official TestFlight app and get the build. No expiry. Best for inviting family or coworkers without each plugging into your Mac.</p>
+      <h3>Path C — TestFlight (paid, polished, for inviting others)</h3>
+      <p>If you have an Apple Developer account ($99/yr), Xcode → Product → Archive → Distribute App → App Store Connect → upload. Then in <a href="https://appstoreconnect.apple.com" target="_blank" rel="noopener">App Store Connect</a> → TestFlight → invite testers via email. They install Apple's official TestFlight app and get the build. No expiry, no plugging in cables.</p>
 
-      <h3>Pointing the app at this server</h3>
-      <p>Once the iOS app is installed, tap the gear icon → Settings:</p>
+      <h3>iOS permissions you'll be asked for</h3>
       <table>
-        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <thead><tr><th>Permission</th><th>Why</th></tr></thead>
         <tbody>
-          <tr><td><strong>Host</strong></td><td>Your Aside domain (no <code>https://</code>, no port). Example: <code>aside.example.com</code></td></tr>
-          <tr><td><strong>Port</strong></td><td><code>443</code> if you're behind a reverse proxy that terminates HTTPS (typical), <code>18790</code> if you're hitting the container directly</td></tr>
-          <tr><td><strong>Mode</strong></td><td>Gateway (REST) for this kind of hosted deployment. Channel mode is only for a Mac running Claude Desktop locally.</td></tr>
-          <tr><td><strong>Gateway API key</strong></td><td>Optional but recommended for native use — see below</td></tr>
+          <tr><td><strong>Microphone</strong></td><td>Speech-to-text on every Talk session. Recording stays on-device — only the transcribed text is sent to the server.</td></tr>
+          <tr><td><strong>Speech Recognition</strong></td><td>Lets Apple's <code>SFSpeechRecognizer</code> turn audio into text. Required for voice input.</td></tr>
+          <tr><td><strong>Camera</strong></td><td>Snapshot/video for vision context. Captured frames are sent to the Aside server (and from there to Claude).</td></tr>
+          <tr><td><strong>Bluetooth</strong></td><td>Only needed for Meta Ray-Ban glasses. Skip if you're not using them.</td></tr>
+          <tr><td><strong>Notifications</strong></td><td>Optional — for surfacing reply summaries when the app is backgrounded.</td></tr>
         </tbody>
       </table>
 
-      <h3>Authenticating the iPhone (two options)</h3>
-      <p><strong>Option A — session cookie.</strong> Open the in-app web view, log in with your email + password just like in a desktop browser. The session cookie persists for 24 hours; you re-log when it expires.</p>
-      <p><strong>Option B — gateway API key.</strong> The operator generates a single shared secret on the server (in the container's <code>.env</code>):</p>
-      <pre>GATEWAY_API_KEY=$(openssl rand -hex 32)</pre>
-      <p>Restart the container, then paste that 64-char hex string into the iOS app's <em>Gateway API key</em> field. The app sends it as <code>X-Gateway-Key</code> on every request — no login required, no cookie expiry. Useful for a phone that's always you.</p>
+      <h3>Settings — pointing the app at this server</h3>
+      <p>Tap the gear icon → Settings. The native app supports two distinct connection modes:</p>
+
+      <table>
+        <thead><tr><th>Mode</th><th>When to use</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Gateway</strong> (REST)</td>
+            <td>You're connecting to a hosted Aside server (this one). Most common path. Talks HTTP to <code>/chat</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>Channel</strong> (WebSocket)</td>
+            <td>You're running Aside's Channel server on a Mac and want the phone to bridge into Claude Desktop's Cowork mode. See the Cowork section below.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>For Gateway mode (this hosted setup):</strong></p>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Host</strong></td><td>Your Aside domain — just the host, no <code>https://</code>, no port. Example: <code>aside.example.com</code></td></tr>
+          <tr><td><strong>Port</strong></td><td><code>443</code> if you're behind a reverse proxy that terminates HTTPS (typical Plesk / nginx setup), <code>18790</code> if you're hitting the container directly</td></tr>
+          <tr><td><strong>Mode</strong></td><td><em>Gateway</em></td></tr>
+          <tr><td><strong>Channel Token</strong></td><td>Leave blank — this is only for Channel mode</td></tr>
+          <tr><td><strong>Gateway API key</strong></td><td>Optional but recommended (see Authentication below)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Authentication options for Gateway mode</h3>
+      <p><strong>Option A — session cookie.</strong> The app opens an in-app web view, you log in with your email + password just like in a desktop browser. The session cookie persists for 24 hours. When it expires, the app prompts you to log in again. Best if multiple people share an iPhone (the cookie can be cleared).</p>
+
+      <p><strong>Option B — gateway API key.</strong> A single long-lived secret you generate on the server and paste into the iOS app. No login required, no cookie expiry. Best if the phone is always you. The operator runs:</p>
+      <pre>openssl rand -hex 32  # generate a 64-char hex string
+# Add to .env on the server:
+GATEWAY_API_KEY=&lt;the hex string&gt;
+# Restart:
+docker compose restart</pre>
+      <p>Then in the iOS app → Settings → Gateway API key → paste the hex string. The app now sends <code>X-Gateway-Key</code> on every request.</p>
+
       <div class="callout">
-        <strong>Same Aside, same account?</strong> Either way the iOS app talks to the same Gateway your browser does. Your conversation history, MCP connectors, and skills follow you between devices.
+        <strong>Same Aside, same account.</strong> Either way the iOS app talks to the same backend your browser does. Your conversation history, MCP connectors, and skills follow you between devices. Switching devices doesn't lose context.
       </div>
 
       <h3>Connecting Meta Ray-Ban glasses</h3>
-      <p>Only available in the native iOS app (Bluetooth APIs aren't web-exposed). In Settings, scroll to <em>Meta Ray-Ban Glasses</em> and tap Register. The app uses the official Meta Wearables toolkit to enumerate paired glasses and stream camera frames. The glasses themselves must already be paired via the Meta View app first — Aside consumes the existing Bluetooth connection.</p>
+      <p>Only available in the native iOS app (Bluetooth APIs aren't exposed to web pages).</p>
+      <ol>
+        <li><strong>Pair the glasses in Meta View first.</strong> The official Meta View app handles the initial Bluetooth pairing. Aside consumes the existing pairing; it can't initiate one.</li>
+        <li>Open Aside → Settings → scroll to <em>Meta Ray-Ban Glasses</em>.</li>
+        <li>Tap <em>Register</em>. The Wearables Device Access Toolkit lists your paired glasses.</li>
+        <li>Select the pair. Status shows <em>Connected</em>. From now on, Aside can pull camera frames from the glasses instead of the iPhone camera.</li>
+        <li>In the voice client header, the camera source toggles between iPhone and Ray-Ban.</li>
+      </ol>
+      <p style="font-size:13px;color:#7B7468">The glasses don't have a built-in microphone exposed to third-party apps yet (Meta's API gates this). Voice still goes through the iPhone microphone. The glasses contribute camera frames only — but those frames are 720p with open-ear audio context that's hard to match holding a phone up.</p>
+
+      <h3>Behavior notes</h3>
+      <ul>
+        <li><strong>Backgrounded audio</strong> — the native app holds an audio session and continues playing TTS when you lock the screen or switch apps. The PWA can't reliably do this; iOS suspends Safari audio after ~30 seconds.</li>
+        <li><strong>Battery</strong> — continuous frame capture is the expensive part. With camera on at 1Hz, expect ~15% battery per hour on a recent iPhone. Voice-only (camera toggled off) is barely measurable.</li>
+        <li><strong>Connectivity</strong> — the app handles brief network drops automatically (it re-queues the next message). If your Aside server is unreachable for &gt;30s, you'll see a banner; turns are dropped, not buffered.</li>
+      </ul>
     </div>
 
     <div class="card" id="skills">
@@ -466,6 +531,127 @@ the actual visible text over inference.</pre>
       </div>
     </div>
 
+    <div class="card" id="cowork">
+      <h2>Claude Desktop &amp; Cowork</h2>
+      <p><strong>Cowork</strong> is Claude Desktop's agent mode, launched March 2026. Unlike chatting with Claude in the web app or the API, Cowork runs locally on your Mac and can use your filesystem, browser, computer-use, and any MCP servers you've configured — it acts on things for you, not just talks about them. <strong>Dispatch</strong> is the companion feature that pairs your phone (via QR code in Anthropic's mobile app) to a desktop Cowork session, so you can drive the agent from anywhere.</p>
+
+      <p>Aside ships in two pieces:</p>
+      <table>
+        <thead><tr><th>Mode</th><th>What it is</th><th>Who runs it</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Gateway</strong></td>
+            <td>The hosted multi-user web service you're using right now. Talks directly to Anthropic's API; has its own accounts, keys, conversation history. This help page is served from a Gateway.</td>
+            <td>The operator runs one Gateway; everyone shares it.</td>
+          </tr>
+          <tr>
+            <td><strong>Channel</strong></td>
+            <td>A small server you run on your <em>own</em> Mac alongside Claude Desktop. It registers as an MCP server with Cowork, giving the desktop agent eyes and ears through your iPhone or Ray-Ban glasses.</td>
+            <td>Each user runs their own Channel on their own Mac.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>If you want to use Cowork (rather than the hosted Gateway you're on now) for actual work tasks — and have your phone be its sensors — set up Channel mode on your Mac. The two modes coexist; you can use whichever fits the task.</p>
+
+      <h3>How Channel mode bridges to Cowork</h3>
+      <p>When you wire Aside's Channel server into <code>claude_desktop_config.json</code>, Cowork gains four new MCP tools that let it talk to your phone:</p>
+      <table>
+        <thead><tr><th>Tool</th><th>What Cowork can do with it</th></tr></thead>
+        <tbody>
+          <tr><td><code>reply</code></td><td>Send a text reply back to the phone (with optional TTS audio). Cowork's natural-feeling responses.</td></tr>
+          <tr><td><code>edit_message</code></td><td>Edit a previously-sent reply. For corrections mid-thought.</td></tr>
+          <tr><td><code>get_camera_snapshot</code></td><td>Pull a fresh photo from the user's active camera. Cowork can ask <em>"show me what you're looking at"</em> mid-task.</td></tr>
+          <tr><td><code>request_voice_input</code></td><td>Speak a clarifying question via TTS and wait for the user's spoken reply. Returns the transcribed text inline.</td></tr>
+        </tbody>
+      </table>
+
+      <p>So for example, you say <em>"book the train to Edinburgh on Thursday"</em>; Cowork browses to the train booking site, gets to checkout, then calls <code>request_voice_input</code> to ask <em>"Should I use the Sainsbury's card or the Monzo one?"</em>. You answer naturally and Cowork completes the booking — without you needing to look at the Mac.</p>
+
+      <h3>Setting up Channel mode on your Mac</h3>
+      <p>This is independent of the hosted Gateway you're on right now. You need:</p>
+      <ul>
+        <li>A Mac running macOS 14+ with Claude Desktop installed</li>
+        <li>An Anthropic Pro or Max subscription (Cowork isn't on Free)</li>
+        <li><code>bun</code> installed: <code>curl -fsSL https://bun.sh/install | bash</code></li>
+        <li>A clone of the Aside repository on the Mac</li>
+      </ul>
+
+      <p><strong>Step-by-step:</strong></p>
+      <ol>
+        <li><strong>Boot the Channel server standalone once</strong> to verify it works:
+          <pre>cd ~/aside/ClaudeVision/channel
+bun install
+bun server.ts</pre>
+          You should see a startup banner with a generated channel token. <code>Ctrl-C</code> to stop.
+        </li>
+        <li><strong>Edit Claude Desktop's MCP config</strong> at <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (Windows: <code>%APPDATA%\Claude\</code>). Add (merge — do not replace any existing <code>mcpServers</code> block):
+          <pre>{
+  "mcpServers": {
+    "aside": {
+      "command": "bun",
+      "args": [
+        "run",
+        "/Users/you/aside/ClaudeVision/channel/server.ts"
+      ]
+    }
+  }
+}</pre>
+          Use the absolute path. If <code>bun</code> isn't on Claude Desktop's <code>PATH</code>, use the absolute path to bun too (<code>which bun</code> to find it).
+        </li>
+        <li><strong>Fully quit and reopen Claude Desktop</strong> (⌘Q — closing the window isn't enough). MCP servers are only loaded on startup.</li>
+        <li><strong>Verify the tools loaded</strong> — in a new Cowork chat, ask <em>"What MCP tools do you have?"</em>. You should see <code>reply</code>, <code>edit_message</code>, <code>get_camera_snapshot</code>, <code>request_voice_input</code> in the list alongside any other MCP servers.</li>
+        <li><strong>Find the channel token</strong> for the iPhone — either open the dashboard at <code>http://localhost:18790</code> in Safari on the Mac, or:
+          <pre>cat ~/.claude/channels/aside/.channel-token</pre>
+        </li>
+        <li><strong>On your iPhone</strong>, open the Aside app → Settings → switch Mode to <em>Channel</em>. Enter:
+          <ul style="margin-top:6px">
+            <li><strong>Host</strong>: your Mac's LAN IP (the dashboard at <code>http://localhost:18790</code> shows it; or <code>System Settings → Wi-Fi → Details</code>)</li>
+            <li><strong>Port</strong>: <code>18790</code></li>
+            <li><strong>Channel Token</strong>: paste from step 5</li>
+          </ul>
+          Tap Connect — green indicator means wired up.
+        </li>
+      </ol>
+
+      <div class="callout">
+        Mac and iPhone must be on the same Wi-Fi network for the iPhone to reach <code>localhost:18790</code> on the Mac. Guest networks often have AP isolation that blocks this — switch to your main network or run a hotspot the Mac also joins.
+      </div>
+
+      <h3>(Optional) Pairing Dispatch alongside</h3>
+      <p>Dispatch is Anthropic's QR-pair feature that lets you drive your Mac's Cowork session from Anthropic's official mobile app. Install Anthropic's mobile app, scan the QR from Claude Desktop's pairing UI, done.</p>
+      <p>Dispatch and Aside Channel mode are <strong>complementary</strong>, not competing:</p>
+      <ul>
+        <li><strong>Dispatch</strong> = your phone is a chat-style remote control for the Mac's Cowork agent</li>
+        <li><strong>Aside Channel</strong> = your phone is sensors (camera, voice) Cowork can use during any task, including ones initiated via Dispatch</li>
+      </ul>
+      <p>Use both at once and you get the killer flow: you're walking around with the Anthropic app and your Aside iPhone connected. You ask Cowork (via Dispatch) to do something; mid-task it needs to see a thing — it calls <code>get_camera_snapshot</code> through Aside's MCP server, your phone takes the photo, the answer goes back to Cowork. You never touched the Mac.</p>
+
+      <h3>Which mode for which task?</h3>
+      <table>
+        <thead><tr><th>Task</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td><em>"What am I looking at?" — quick visual Q&amp;A</em></td><td>Gateway (this hosted server)</td></tr>
+          <tr><td><em>"Read this label and translate"</em></td><td>Gateway</td></tr>
+          <tr><td><em>"What's on the screen?"</em></td><td>Either</td></tr>
+          <tr><td><em>"Refactor this file" — actual code work</em></td><td>Channel mode + Claude Code (more agentic)</td></tr>
+          <tr><td><em>"Book the train, send the email" — multi-step</em></td><td>Channel mode + Cowork (has computer-use)</td></tr>
+          <tr><td><em>Multi-user / sharing with family / friends</em></td><td>Gateway (each user has their own account)</td></tr>
+          <tr><td><em>Solo, max capability, paid Anthropic plan</em></td><td>Channel mode + Cowork</td></tr>
+        </tbody>
+      </table>
+
+      <h3>State on disk (Channel mode)</h3>
+      <p>The Channel server keeps state at <code>~/.claude/channels/aside/</code> on the Mac:</p>
+      <ul>
+        <li><code>inbox/</code> — images uploaded from the phone</li>
+        <li><code>outbox/</code> — TTS audio and files Cowork pushes back</li>
+        <li><code>.env</code> — ElevenLabs key (configured via the dashboard)</li>
+        <li><code>.channel-token</code> — the shared secret with the iPhone (mode 0600)</li>
+      </ul>
+      <p>You can delete <code>inbox/</code> periodically if disk space matters; it's not auto-cleaned.</p>
+    </div>
+
     <div class="card" id="password">
       <h2>Password reset</h2>
       <p>Two paths:</p>
@@ -500,6 +686,22 @@ the actual visible text over inference.</pre>
 
       <h3>Claude's response is slow</h3>
       <p>Each tool call costs a round-trip to the MCP server hosting it. If a connector is slow, every chat that uses it inherits that latency. Test your connectors individually to find the slow one and disable or remove it.</p>
+
+      <h3>Channel mode: "What MCP tools do you have?" doesn't list Aside's tools</h3>
+      <ul>
+        <li>Did you fully quit Claude Desktop with ⌘Q before reopening? Closing the window keeps the process running and MCP servers don't reload.</li>
+        <li>Check the path to <code>server.ts</code> in <code>claude_desktop_config.json</code> is absolute and correct (<code>ls -la &lt;path&gt;</code> should find it).</li>
+        <li>If <code>bun</code> isn't on Claude Desktop's <code>PATH</code>, use the absolute path: <code>which bun</code> to find it, then replace <code>"bun"</code> with that path in the config.</li>
+        <li>Read Claude Desktop's MCP log at <code>~/Library/Logs/Claude/mcp.log</code> for the actual startup error.</li>
+      </ul>
+
+      <h3>Channel mode: iPhone won't connect to Mac</h3>
+      <ul>
+        <li>Are both on the same Wi-Fi network? Mac on wired Ethernet + phone on Wi-Fi often counts as different networks.</li>
+        <li>Guest network with AP isolation will block this. Switch to a non-isolated network or run a hotspot the Mac also joins.</li>
+        <li>Verify the Mac's LAN IP — it changes on network switches.</li>
+        <li>Confirm the Channel server is actually running: open <code>http://localhost:18790</code> on the Mac.</li>
+      </ul>
 
       <h3>I added a skill but Claude doesn't seem to use it</h3>
       <ul>
