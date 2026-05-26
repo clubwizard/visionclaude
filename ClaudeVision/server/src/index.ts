@@ -212,6 +212,7 @@ async function main() {
   app.get("/signup", sendHtml("signup.html"));
   app.get("/account", sendHtml("account.html"));
   app.get("/reset-password", sendHtml("reset-password.html"));
+  app.get("/help", sendHtml("help.html"));
 
   // ── Rate limiter (applied to all API routes below) ──
   app.use(rateLimiter(30));

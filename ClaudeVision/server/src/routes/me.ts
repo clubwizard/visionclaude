@@ -15,6 +15,12 @@ import {
   deleteUserMcpServer,
   validateMcpUrl,
 } from "../user-mcp-servers.js";
+import {
+  createUserSkill,
+  listUserSkills,
+  updateUserSkill,
+  deleteUserSkill,
+} from "../user-skills.js";
 import { requireAuth } from "../middleware.js";
 import type { MCPManager } from "../mcp-manager.js";
 import type { SkillLoader } from "../skill-loader.js";
@@ -61,28 +67,15 @@ export function createMeRouter(
     res.json({ ok: true, updated: updates, keys: getUserKeyStatus(userId) });
   });
 
-  // GET /me/mcp-info — read-only view of what MCP servers and skills
-  // this Gateway has loaded, plus a pointer to the Claude Desktop setup
-  // guide. Not sensitive (no auth tokens, no env values) — just the
-  // info a user needs to verify their Cowork-connector setup is wired up.
+  // GET /me/mcp-info — read-only summary of operator-shared MCP servers
+  // and skills available to every account. Counts + names only; no host
+  // paths, no env values, no auth material. The user's OWN per-account
+  // MCP connectors come from /me/mcp-servers instead.
   router.get("/mcp-info", (_req, res) => {
     const servers = mcpManager.getServerStatus(); // [{name, toolCount, type}]
     const skills = skillLoader.getSkillList();    // [{name, description, trigger}]
     const totalTools = servers.reduce((sum, s) => sum + s.toolCount, 0);
-    res.json({
-      configPath: process.env.MCP_CONFIG_PATH || "(default: ~/Library/Application Support/Claude/claude_desktop_config.json)",
-      servers,
-      totalTools,
-      skills,
-      // Static doc URLs — point at the canonical GitHub copies so they
-      // stay live even on a stale Gateway deploy.
-      docs: {
-        coworkSetup:
-          "https://github.com/clubwizard/visionclaude/blob/main/ClaudeVision/docs/CLAUDE_DESKTOP_SETUP.md",
-        helpGuide:
-          "https://github.com/clubwizard/visionclaude/blob/main/ClaudeVision/docs/HELP.md",
-      },
-    });
+    res.json({ servers, totalTools, skills });
   });
 
   // ── Per-user remote MCP servers ─────────────────────────────────────
@@ -163,6 +156,75 @@ export function createMeRouter(
       const message = err instanceof Error ? err.message : String(err);
       res.status(502).json({ ok: false, error: message });
     }
+  });
+
+  // ── Per-user skills ─────────────────────────────────────────────────
+  //
+  // Skills are short prompts the user installs to specialize how Claude
+  // responds to certain inputs. We store the full body but only inject
+  // it into the system prompt for chats where the user's message matches
+  // a trigger keyword — see buildUserSkillsAppendix() in user-skills.ts.
+
+  router.get("/skills", (req, res) => {
+    res.json({ skills: listUserSkills(req.session.userId!) });
+  });
+
+  router.post("/skills", (req, res) => {
+    const body = req.body as {
+      name?: unknown;
+      description?: unknown;
+      trigger?: unknown;
+      body?: unknown;
+    };
+    if (
+      typeof body.name !== "string" ||
+      typeof body.description !== "string" ||
+      typeof body.body !== "string"
+    ) {
+      res.status(400).json({ error: "name, description, and body are required strings" });
+      return;
+    }
+    try {
+      const skill = createUserSkill({
+        userId: req.session.userId!,
+        name: body.name,
+        description: body.description,
+        trigger: typeof body.trigger === "string" ? body.trigger : "",
+        body: body.body,
+      });
+      res.json({ ok: true, skill });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : "Invalid input" });
+    }
+  });
+
+  router.patch("/skills/:id", (req, res) => {
+    const patch = req.body as Record<string, unknown>;
+    try {
+      const updated = updateUserSkill(req.session.userId!, req.params.id, {
+        name: typeof patch.name === "string" ? patch.name : undefined,
+        description: typeof patch.description === "string" ? patch.description : undefined,
+        trigger: typeof patch.trigger === "string" ? patch.trigger : undefined,
+        body: typeof patch.body === "string" ? patch.body : undefined,
+        enabled: typeof patch.enabled === "boolean" ? patch.enabled : undefined,
+      });
+      if (!updated) {
+        res.status(404).json({ error: "Skill not found" });
+        return;
+      }
+      res.json({ ok: true, skill: updated });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : "Invalid input" });
+    }
+  });
+
+  router.delete("/skills/:id", (req, res) => {
+    const ok = deleteUserSkill(req.session.userId!, req.params.id);
+    if (!ok) {
+      res.status(404).json({ error: "Skill not found" });
+      return;
+    }
+    res.json({ ok: true });
   });
 
   // POST /me/api-keys/test — verify a key actually works against the

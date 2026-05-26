@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Aside — Help</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Instrument+Serif:ital@0&display=swap" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      padding: 32px 20px 64px;
+      padding-top: calc(32px + env(safe-area-inset-top));
+      background: #F4EFE5;
+      font-family: 'Inter Tight', sans-serif;
+      color: #1A1714;
+      line-height: 1.55;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: env(safe-area-inset-top);
+      background: #F4EFE5;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 40px; letter-spacing: -0.02em; margin-bottom: 4px; }
+    .sub { color: #7B7468; font-size: 14px; margin-bottom: 32px; }
+    .sub a { color: inherit; }
+
+    nav {
+      background: #fff;
+      border: 1px solid #D9D1C0;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+    nav ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+    nav a { color: #4A4540; text-decoration: none; }
+    nav a:hover { color: #C25A2B; text-decoration: underline; }
+
+    .card { background: #fff; border: 1px solid #D9D1C0; border-radius: 16px; padding: 26px; margin-bottom: 22px; }
+    .card h2 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 24px; letter-spacing: -0.01em; margin-bottom: 6px; scroll-margin-top: 80px; }
+    .card h3 { font-family: 'Inter Tight', sans-serif; font-weight: 600; font-size: 14px; margin-top: 18px; margin-bottom: 6px; color: #1A1714; }
+    .card p { margin-bottom: 10px; color: #4A4540; }
+    .card ul, .card ol { margin: 6px 0 12px 22px; color: #4A4540; }
+    .card li { margin-bottom: 4px; }
+    .card a { color: #C25A2B; }
+    .card code { font-family: ui-monospace, monospace; font-size: 12px; background: #FAF6EC; padding: 1px 6px; border-radius: 4px; color: #4A4540; }
+    .card pre {
+      background: #FAF6EC;
+      border: 1px solid #E8E0CC;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 10px 0;
+      overflow-x: auto;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      color: #4A4540;
+      line-height: 1.5;
+    }
+    .card .label {
+      display: inline-block;
+      font-family: ui-monospace, monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #7B7468;
+      margin-bottom: 4px;
+    }
+    .example {
+      background: #FAF6EC;
+      border-left: 3px solid #6FE3A8;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      margin: 12px 0;
+    }
+    .example .label { color: #2F8A57; }
+    .callout {
+      background: #FFF7EA;
+      border: 1px solid #E89A6B;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin: 12px 0;
+      font-size: 13px;
+      color: #7B5F2A;
+    }
+    .links { font-size: 13px; color: #7B7468; margin-top: 24px; text-align: center; }
+    .links a { color: inherit; margin: 0 10px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #E8E0CC; vertical-align: top; }
+    th { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #7B7468; }
+    td { color: #4A4540; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Help</h1>
+    <div class="sub">Everything in one page. <a href="/account">← Back to account</a></div>
+
+    <nav>
+      <ol>
+        <li><a href="#start">Getting started</a></li>
+        <li><a href="#keys">API keys</a></li>
+        <li><a href="#voice">Voice client</a></li>
+        <li><a href="#skills">Skills</a></li>
+        <li><a href="#mcp">MCP connectors</a></li>
+        <li><a href="#password">Password reset</a></li>
+        <li><a href="#trouble">Troubleshooting</a></li>
+      </ol>
+    </nav>
+
+    <div class="card" id="start">
+      <h2>Getting started</h2>
+      <p>Aside lets you talk to Claude with your voice, optionally with vision from your camera. Everything is per-account: your API keys, conversation history, MCP connectors, and custom skills are all isolated from other users on this server.</p>
+
+      <h3>The 90-second setup</h3>
+      <ol>
+        <li>Go to <a href="/account">/account</a> and paste your <strong>Anthropic API key</strong>. Hit <em>Test</em> to confirm it works. This is the one required key — without it, nothing can talk to Claude.</li>
+        <li><em>(Optional)</em> Paste a <strong>Deepgram</strong> or <strong>OpenAI</strong> key for high-quality text-to-speech. Without either, the voice client falls back to your browser's built-in TTS (works, but sounds robotic).</li>
+        <li>Go to <a href="/app">/app</a> and tap <em>Talk</em>. Say something.</li>
+      </ol>
+    </div>
+
+    <div class="card" id="keys">
+      <h2>API keys</h2>
+      <p>All keys are encrypted at rest with the server's master key. The server can only decrypt them at request time, and never sends them back to your browser.</p>
+
+      <h3>Anthropic (required)</h3>
+      <p>This is what powers Claude itself. You pay Anthropic directly for what you use — Aside just relays.</p>
+      <div class="example">
+        <div class="label">Where to get one</div>
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a> → New API key → copy → paste into the Anthropic field on <a href="/account">/account</a>.
+      </div>
+      <div class="example">
+        <div class="label">What it looks like</div>
+        <code>sk-ant-api03-AbC...XyZ</code>
+      </div>
+
+      <h3>Deepgram (optional, recommended)</h3>
+      <p>High-quality, low-latency text-to-speech (the Aura voices) and speech-to-text. The default voice on <a href="/app">/app</a>.</p>
+      <div class="example">
+        <div class="label">Where to get one</div>
+        <a href="https://console.deepgram.com/" target="_blank" rel="noopener">console.deepgram.com</a> → sign up → API Keys → create.
+      </div>
+      <div class="example">
+        <div class="label">What it looks like</div>
+        <code>a1b2c3d4e5f67890abcdef1234567890</code>
+      </div>
+
+      <h3>OpenAI (optional)</h3>
+      <p>An alternative set of TTS voices (Alloy, Nova, Echo, …). More expressive than Deepgram, slightly slower. Useful if you want a specific voice character.</p>
+      <div class="example">
+        <div class="label">Where to get one</div>
+        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> → Create new secret key.
+      </div>
+    </div>
+
+    <div class="card" id="voice">
+      <h2>Voice client</h2>
+      <p>Open <a href="/app">/app</a> on your phone or computer. Grant camera + microphone permission when prompted.</p>
+
+      <h3>How a turn works</h3>
+      <ol>
+        <li>Tap <strong>Talk</strong>. The mic activates.</li>
+        <li>Speak normally. When you pause, the recording stops and the transcript is sent to Claude.</li>
+        <li>If <em>Camera on</em> is checked, the current frame is included as vision context.</li>
+        <li>Claude responds. The TTS plays automatically through your speakers/headphones.</li>
+        <li>Tap <strong>Talk</strong> again for the next turn (the conversation continues until you reload).</li>
+      </ol>
+
+      <h3>Example things to try</h3>
+      <ul>
+        <li>Point your camera at a label and ask <em>"What does this say?"</em></li>
+        <li>Show Claude a recipe and ask <em>"Convert this to grams."</em></li>
+        <li>Show a stack trace on your screen and ask <em>"What's wrong here?"</em></li>
+        <li>Just chat — vision is optional, you don't need to point the camera at anything.</li>
+      </ul>
+
+      <h3>Choosing a voice</h3>
+      <p>The <em>Voice</em> dropdown lists every voice your configured keys unlock. With only Deepgram set you'll see 10 Aura-2 voices; with OpenAI too, 20. Selection is saved in your browser.</p>
+    </div>
+
+    <div class="card" id="skills">
+      <h2>Skills</h2>
+      <p>Skills are short prompts you install to specialize how Claude responds for you. Think of them as personal preferences Claude follows in specific situations — without you having to repeat yourself every turn.</p>
+
+      <p>Each skill has four parts:</p>
+      <table>
+        <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Name</strong></td><td>Short identifier you'll recognize. ≤64 chars.</td></tr>
+          <tr><td><strong>Description</strong></td><td>One line telling Claude what the skill does. ≤280 chars. Always in the system prompt so Claude knows the skill exists.</td></tr>
+          <tr><td><strong>Trigger</strong></td><td>Comma-separated keywords. When your message contains one, the full body is injected. Empty = advertised but never auto-injected.</td></tr>
+          <tr><td><strong>Body</strong></td><td>The actual instructions Claude follows when triggered. ≤8 KB.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Example: recipe converter</h3>
+      <div class="example">
+        <div class="label">Name</div>
+        Recipe converter
+        <div class="label" style="margin-top:8px">Description</div>
+        Convert cooking volumes to grams using standard density tables.
+        <div class="label" style="margin-top:8px">Trigger</div>
+        recipe, convert, grams, cups, tbsp, tsp
+        <div class="label" style="margin-top:8px">Body</div>
+        <pre>When the user mentions a cooking quantity in volume
+(cups, tbsp, tsp, ml), convert it to grams using standard
+density tables. Show the conversion factor briefly.
+Example: "2 cups flour ≈ 240g (1 cup ≈ 120g)".</pre>
+      </div>
+
+      <h3>Example: meeting summarizer</h3>
+      <div class="example">
+        <div class="label">Name</div>
+        Meeting notes
+        <div class="label" style="margin-top:8px">Description</div>
+        Summarize meeting transcripts into actions, decisions, and open questions.
+        <div class="label" style="margin-top:8px">Trigger</div>
+        meeting, summarize, action items, recap
+        <div class="label" style="margin-top:8px">Body</div>
+        <pre>When given a meeting transcript or notes, produce three
+sections:
+- Decisions (what was agreed)
+- Actions (who owes what by when)
+- Open questions (unresolved items)
+Keep each bullet to one line. Use names not pronouns.</pre>
+      </div>
+
+      <h3>Example: shopping mode</h3>
+      <div class="example">
+        <div class="label">Name</div>
+        Shopping
+        <div class="label" style="margin-top:8px">Description</div>
+        When shown a product, read price, brand, key specs.
+        <div class="label" style="margin-top:8px">Trigger</div>
+        <em>(empty — always advertised, body never auto-injected)</em>
+        <div class="label" style="margin-top:8px">Body</div>
+        <pre>When the user points the camera at a product label or
+price tag, extract: brand, model/variant, price (with
+currency), and any key specs visible. Prefer reading
+the actual visible text over inference.</pre>
+      </div>
+
+      <p style="margin-top:14px;font-size:13px;color:#7B7468">A skill with no trigger is always advertised in Claude's system prompt but the body is never auto-included. Use this when the skill applies broadly and you want Claude to know about it always.</p>
+
+      <div class="callout">
+        <strong>Token cost.</strong> Every enabled skill's description sits in your system prompt on every turn. Bodies only ride along when their trigger fires. So 20 skills with 200-char descriptions ≈ 4 KB extra header; a triggered 2 KB body adds another 2 KB just for that turn. Practical limit is around 30 skills before you start feeling it in latency.
+      </div>
+    </div>
+
+    <div class="card" id="mcp">
+      <h2>MCP connectors</h2>
+      <p>An MCP server is a hosted endpoint that exposes tools (send_message, search_repos, query_database…) over HTTP. When you add one, its tools become available to Claude on your next chat — scoped to your account only.</p>
+
+      <p>Two requirements for a connector to work here:</p>
+      <ul>
+        <li>The endpoint must use <strong>https://</strong> (plain http and private IPs are blocked)</li>
+        <li>It must speak the MCP protocol (StreamableHTTP or SSE)</li>
+      </ul>
+
+      <h3>Example: a hosted MCP service</h3>
+      <div class="example">
+        <div class="label">Name</div>
+        My Notion workspace
+        <div class="label" style="margin-top:8px">URL</div>
+        <code>https://mcp.notion.example/sse</code>
+        <div class="label" style="margin-top:8px">Auth header</div>
+        <code>Bearer ntn_AbCdEf123...</code>
+      </div>
+      <p style="font-size:13px;color:#7B7468">Most hosted MCP services give you a URL + a token. Paste the token with the <code>Bearer</code> prefix unless they say otherwise. The token is encrypted at rest and never returns to the browser.</p>
+
+      <h3>Example: self-hosted on a public URL</h3>
+      <div class="example">
+        <div class="label">Name</div>
+        My company GitHub
+        <div class="label" style="margin-top:8px">URL</div>
+        <code>https://mcp.your-company.com/github</code>
+        <div class="label" style="margin-top:8px">Auth header</div>
+        <code>Bearer ghp_yourPersonalAccessToken</code>
+      </div>
+
+      <h3>Testing a connector</h3>
+      <p>After saving, hit the <strong>Test</strong> button on the row. The server opens a probe connection to your URL, lists the tools it advertises, and reports back. You'll see <em>"Connected. N tools available."</em> on success or a clear error if it fails (bad URL, bad auth, server offline, timeout).</p>
+
+      <h3>What happens during a chat</h3>
+      <ol>
+        <li>Your enabled connectors stay disconnected until you actually use them.</li>
+        <li>On your first <code>/chat</code> after enabling one, the server opens a connection, lists tools, and merges them into the tool set Claude sees.</li>
+        <li>Connections are cached per user. If you go idle for 10 minutes, the connection is dropped (auto-reopened on next use).</li>
+        <li>Each tool call has a 30-second timeout. If your connector hangs, the request fails cleanly instead of blocking the whole chat.</li>
+      </ol>
+
+      <div class="callout">
+        <strong>Not seeing your tools in Claude's responses?</strong> Claude only invokes tools when it judges them relevant. Mention the tool explicitly (<em>"check my Notion for the meeting note"</em>) or hit <strong>Test</strong> on the connector row first to confirm it's reachable.
+      </div>
+    </div>
+
+    <div class="card" id="password">
+      <h2>Password reset</h2>
+      <p>Two paths:</p>
+      <h3>1. Forgot password link (recommended)</h3>
+      <ol>
+        <li>On the login modal, click <em>"Forgot your password?"</em></li>
+        <li>Enter your email. A reset link is sent.</li>
+        <li>Click the link within 1 hour. Set your new password.</li>
+        <li>Log in with the new password.</li>
+      </ol>
+      <p style="font-size:13px;color:#7B7468">A successful reset invalidates your sessions on every other device. If you reset on your phone, your laptop session gets logged out on its next request.</p>
+
+      <h3>2. Operator override</h3>
+      <p>If email isn't configured on this server, the operator can reset your password via CLI. Ask them.</p>
+    </div>
+
+    <div class="card" id="trouble">
+      <h2>Troubleshooting</h2>
+
+      <h3>"No Anthropic API key configured"</h3>
+      <p>Go to <a href="/account">/account</a>, paste your <code>sk-ant-...</code> key, hit Save. The Anthropic key is the only required one — without it nothing can talk to Claude.</p>
+
+      <h3>Voice client says "Voice list unavailable" or shows no voices</h3>
+      <p>The voice dropdown is built from your configured TTS keys. Add a Deepgram or OpenAI key on <a href="/account">/account</a>. Without either, the browser falls back to its built-in TTS (works, but no provider voices).</p>
+
+      <h3>MCP connector test fails with "Connection failed"</h3>
+      <ul>
+        <li>Double-check the URL is reachable from a browser (<code>curl -I https://your-url</code>)</li>
+        <li>Confirm the auth header format the service expects (most want <code>Bearer xxx</code>; some want just <code>xxx</code>)</li>
+        <li>Make sure the server actually speaks MCP at that endpoint — many APIs are HTTP but not MCP</li>
+      </ul>
+
+      <h3>Claude's response is slow</h3>
+      <p>Each tool call costs a round-trip to the MCP server hosting it. If a connector is slow, every chat that uses it inherits that latency. Test your connectors individually to find the slow one and disable or remove it.</p>
+
+      <h3>I added a skill but Claude doesn't seem to use it</h3>
+      <ul>
+        <li>Check the skill is <em>enabled</em> (toggle on the row)</li>
+        <li>Make sure your trigger keywords actually appear in your message. Case doesn't matter but exact substring does — "convert" won't match "converted"</li>
+        <li>Try making the description more imperative ("ALWAYS convert..." vs "Sometimes convert...")</li>
+      </ul>
+
+      <h3>Got logged out unexpectedly</h3>
+      <p>If you reset your password on another device, your other sessions are invalidated on their next request. Just log in again — it's by design.</p>
+
+      <h3>Something else</h3>
+      <p>Ask the operator of this server. The system administrator has access to server logs and can see what failed.</p>
+    </div>
+
+    <div class="links">
+      <a href="/account">← Back to account</a>
+      <a href="/app">Voice client →</a>
+    </div>
+  </div>
+</body>
+</html>

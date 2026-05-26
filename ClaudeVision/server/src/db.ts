@@ -100,6 +100,27 @@ function runMigrations(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_user_mcp_servers_user_id
       ON user_mcp_servers(user_id);
+
+    -- Per-user skills. Skills are bits of text that get appended to the
+    -- system prompt at chat time, telling Claude how to handle a class
+    -- of input ("when the user asks to read a sign, OCR carefully and
+    -- read line by line"). The operator's shared skills come from
+    -- SKILL.md files on the host filesystem and are loaded once at
+    -- boot; these per-user skills are stored in SQLite and merged
+    -- into the prompt only for the requesting user.
+    CREATE TABLE IF NOT EXISTS user_skills (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      trigger TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_skills_user_id
+      ON user_skills(user_id);
   `);
 
   // Incremental columns — SQLite has no IF NOT EXISTS for ADD COLUMN, so

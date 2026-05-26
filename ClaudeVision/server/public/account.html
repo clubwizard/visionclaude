@@ -132,8 +132,11 @@
     .user-mcp-form { margin-top: 14px; padding: 16px; background: #FAF6EC; border-radius: 10px; }
     .user-mcp-form label { margin-top: 10px; }
     .user-mcp-form label:first-child { margin-top: 0; }
-    .user-mcp-form input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #D9D1C0; background: #FFFDF8; font-size: 14px; font-family: inherit; margin-top: 4px; }
-    .user-mcp-form input:focus { outline: 2px solid #6FE3A8; outline-offset: 1px; }
+    .user-mcp-form input,
+    .user-mcp-form textarea { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #D9D1C0; background: #FFFDF8; font-size: 14px; font-family: inherit; margin-top: 4px; }
+    .user-mcp-form textarea { font-family: ui-monospace, monospace; font-size: 13px; resize: vertical; min-height: 100px; }
+    .user-mcp-form input:focus,
+    .user-mcp-form textarea:focus { outline: 2px solid #6FE3A8; outline-offset: 1px; }
     .user-mcp-form-actions { margin-top: 14px; display: flex; gap: 8px; }
     .user-mcp-form button { padding: 10px 16px; border-radius: 8px; border: 1px solid #6FE3A8; background: #6FE3A8; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
     .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1A1714; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity 0.2s; }
@@ -203,6 +206,49 @@
       </div>
     </div>
 
+    <div class="card" id="user-skills-card">
+      <h2>Your skills</h2>
+      <div class="hint">
+        Short prompt snippets that customize how Claude responds when your message matches one of the trigger keywords. Useful for personal workflows (your cooking style, your dictation conventions, your shorthand). Scoped to your account — other users never see them.
+        <details style="margin-top:8px">
+          <summary style="cursor:pointer;color:#1A1714">How does this work?</summary>
+          <div style="margin-top:8px;line-height:1.6">
+            Each skill has a name, a one-line description, optional trigger keywords (comma-separated), and a body. The descriptions are always present in Claude's system prompt so it knows the skill exists. The full body is injected only when your latest message contains a trigger keyword — keeps the prompt small until the skill is actually needed.
+            <ul style="margin:8px 0 0 18px">
+              <li><strong>Name</strong> — short identifier (≤64 chars).</li>
+              <li><strong>Description</strong> — one line telling Claude what the skill does (≤280 chars).</li>
+              <li><strong>Trigger</strong> — comma-separated keywords that activate the full body. Empty = always advertised but never auto-injected.</li>
+              <li><strong>Body</strong> — the actual instructions Claude follows when triggered (≤8 KB).</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+
+      <div id="user-skills-list"></div>
+
+      <details id="user-skills-add" style="margin-top:16px">
+        <summary style="cursor:pointer;font-weight:500;font-size:14px;color:#1A1714">+ Add a skill</summary>
+        <div class="user-mcp-form">
+          <label for="user-skill-name">Name</label>
+          <input id="user-skill-name" type="text" placeholder="Recipe converter" maxlength="64" />
+
+          <label for="user-skill-desc">Description</label>
+          <input id="user-skill-desc" type="text" placeholder="Convert any cooking measurement to grams" maxlength="280" />
+
+          <label for="user-skill-trigger">Trigger keywords (comma-separated, optional)</label>
+          <input id="user-skill-trigger" type="text" placeholder="convert, grams, weight" maxlength="200" />
+
+          <label for="user-skill-body">Body</label>
+          <textarea id="user-skill-body" rows="6" placeholder="When the user gives a cooking quantity in volume (cups, tbsp...), convert it to grams using standard density tables. Show your conversion factor briefly."></textarea>
+
+          <div id="user-skill-err" class="test-result err" hidden></div>
+          <div class="user-mcp-form-actions">
+            <button class="primary" id="user-skill-save">Save skill</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
     <div class="card" id="user-mcp-card">
       <h2>Your MCP connectors</h2>
       <div class="hint">
@@ -245,7 +291,7 @@
     <div class="card" id="mcp-info-card">
       <h2>Shared tools</h2>
       <div class="hint">
-        Tools the operator has configured on the server, available to every account. Set the <code>MCP_CONFIG_PATH</code> environment variable on the host to point at a different config, or leave it unset to use the default Claude Desktop location.
+        Tools the operator has configured on the server, available to every account in addition to the per-user connectors above.
       </div>
       <div id="mcp-info-body" class="mcp-info-grid">
         <div class="mcp-info-cell">
@@ -264,9 +310,6 @@
           <div class="mcp-info-detail" id="mcp-skill-list">Loading…</div>
         </div>
       </div>
-      <div class="mcp-info-config" id="mcp-config-path">
-        Config: <code>—</code>
-      </div>
     </div>
 
     <div class="card" id="admin-invites-card" hidden>
@@ -284,6 +327,7 @@
 
     <div class="links">
       <a href="/app">← Back to voice client</a>
+      <a href="/help">Help &amp; examples →</a>
     </div>
   </div>
 
@@ -328,6 +372,7 @@
       // placeholder content in place.
       loadMcpInfo();
       loadUserMcpServers();
+      loadUserSkills();
       if (new URLSearchParams(location.search).get('welcome')) {
         toast('Welcome to Aside. Add your keys below to start.');
       }
@@ -428,6 +473,135 @@
                               <button data-token="${safeToken}" data-action="revoke">Revoke</button>`}
         `;
         list.appendChild(row);
+      }
+    }
+
+    async function loadUserSkills() {
+      try {
+        const res = await fetch('/me/skills');
+        if (!res.ok) return;
+        const { skills } = await res.json();
+        const list = $('user-skills-list');
+        list.textContent = '';
+        if (!skills?.length) {
+          const empty = document.createElement('div');
+          empty.className = 'user-mcp-empty';
+          empty.textContent = "No skills yet. Use the form below to add your first one.";
+          list.appendChild(empty);
+          return;
+        }
+        for (const s of skills) {
+          list.appendChild(renderUserSkillRow(s));
+        }
+      } catch {
+        // Non-fatal — leave list empty
+      }
+    }
+
+    function renderUserSkillRow(s) {
+      const row = document.createElement('div');
+      row.className = 'user-mcp-row';
+      row.dataset.id = s.id;
+
+      const who = document.createElement('div');
+      who.className = 'who';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'name';
+      nameEl.textContent = s.name;
+      const descEl = document.createElement('div');
+      descEl.className = 'url'; // reuse the muted-mono style
+      descEl.textContent = s.description;
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const statePill = document.createElement('span');
+      statePill.className = 'pill ' + (s.enabled ? 'set' : 'unset');
+      statePill.textContent = s.enabled ? 'enabled' : 'disabled';
+      meta.appendChild(statePill);
+      if (s.trigger) {
+        const trigPill = document.createElement('span');
+        trigPill.className = 'pill env';
+        trigPill.textContent = 'triggers: ' + s.trigger;
+        meta.appendChild(trigPill);
+      }
+      who.appendChild(nameEl);
+      who.appendChild(descEl);
+      who.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.textContent = s.enabled ? 'Disable' : 'Enable';
+      toggleBtn.onclick = () => toggleUserSkill(s.id, !s.enabled);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'danger';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.onclick = () => deleteUserSkillById(s.id, s.name);
+
+      actions.appendChild(toggleBtn);
+      actions.appendChild(deleteBtn);
+
+      row.appendChild(who);
+      row.appendChild(actions);
+      return row;
+    }
+
+    async function toggleUserSkill(id, enabled) {
+      try {
+        await fetch(`/me/skills/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+      } finally {
+        loadUserSkills();
+      }
+    }
+
+    async function deleteUserSkillById(id, name) {
+      if (!confirm(`Delete the skill "${name}"? This can't be undone.`)) return;
+      try {
+        await fetch(`/me/skills/${id}`, { method: 'DELETE' });
+      } finally {
+        loadUserSkills();
+      }
+    }
+
+    async function saveNewUserSkill() {
+      const errEl = $('user-skill-err');
+      errEl.hidden = true;
+      const name = $('user-skill-name').value.trim();
+      const description = $('user-skill-desc').value.trim();
+      const trigger = $('user-skill-trigger').value.trim();
+      const body = $('user-skill-body').value.trim();
+      if (!name || !description || !body) {
+        errEl.textContent = 'Name, description, and body are required.';
+        errEl.hidden = false;
+        return;
+      }
+      try {
+        const res = await fetch('/me/skills', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description, trigger, body }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          errEl.textContent = data?.error || `Save failed (HTTP ${res.status}).`;
+          errEl.hidden = false;
+          return;
+        }
+        $('user-skill-name').value = '';
+        $('user-skill-desc').value = '';
+        $('user-skill-trigger').value = '';
+        $('user-skill-body').value = '';
+        $('user-skills-add').open = false;
+        toast(`Saved skill "${name}".`);
+        loadUserSkills();
+      } catch {
+        errEl.textContent = 'Network error. Try again.';
+        errEl.hidden = false;
       }
     }
 
@@ -626,13 +800,6 @@
         } else {
           skillList.textContent = 'No skills loaded yet.';
         }
-
-        // Config path — show under a <code> child built via textContent
-        const cfg = $('mcp-config-path');
-        cfg.textContent = 'Config: ';
-        const code = document.createElement('code');
-        code.textContent = data.configPath || '(default)';
-        cfg.appendChild(code);
       } catch {
         // Leave placeholders in place — non-fatal
       }
@@ -750,6 +917,7 @@
     $('openai-clear').onclick = () => clearKey('openai');
     $('openai-test').onclick = () => testKey('openai');
     $('user-mcp-save').onclick = (e) => { e.preventDefault?.(); saveNewUserMcpServer(); };
+    $('user-skill-save').onclick = (e) => { e.preventDefault?.(); saveNewUserSkill(); };
     $('new-invite').onclick = async (e) => {
       const btn = e.currentTarget;
       const res = await fetch('/admin/invites', { method: 'POST' });
