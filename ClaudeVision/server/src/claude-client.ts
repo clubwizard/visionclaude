@@ -8,9 +8,29 @@ import type {
   ToolCallResult,
 } from "./types.js";
 import { getSuccessor, isModelDeprecationError } from "./model-registry.js";
+import { buildUserSkillsAppendix } from "./user-skills.js";
 import { c } from "./console-theme.js";
 
 const MAX_TOOL_ITERATIONS = 10;
+
+// Helper: pull the last user-authored text out of the message array so
+// we can match it against the user's skill triggers. Defaults to the
+// just-arrived `text` if the history is empty.
+function latestUserText(messages: MessageParam[], fallback: string): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "user") continue;
+    if (typeof m.content === "string") return m.content;
+    if (Array.isArray(m.content)) {
+      for (const block of m.content) {
+        if (block.type === "text" && typeof (block as { text?: string }).text === "string") {
+          return (block as { text: string }).text;
+        }
+      }
+    }
+  }
+  return fallback;
+}
 
 export class ClaudeClient {
   private mcpManager: MCPManager;
@@ -148,6 +168,17 @@ export class ClaudeClient {
       ? await this.mcpManager.getToolsForChatForUser(userId)
       : this.mcpManager.getToolsForClaude();
 
+    // Assemble the system prompt. Base prompt is operator-set; when we
+    // have a user, append their custom skills. The appendix is empty
+    // for users with no skills, so this adds zero tokens in the common
+    // case. For users with skills, only the descriptions of all skills
+    // are always appended; bodies are included only when the user's
+    // latest message contains a trigger keyword.
+    const systemPrompt = userId
+      ? this.config.systemPrompt +
+        buildUserSkillsAppendix(userId, latestUserText(messages, text))
+      : this.config.systemPrompt;
+
     // Tool use loop
     const allToolCalls: ToolCallResult[] = [];
     let currentMessages = messages;
@@ -159,7 +190,7 @@ export class ClaudeClient {
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const response = await this.callWithDeprecationRetry(anthropic, {
         max_tokens: this.config.maxTokens,
-        system: this.config.systemPrompt,
+        system: systemPrompt,
         messages: currentMessages,
         ...(tools.length > 0 ? { tools } : {}),
       });
