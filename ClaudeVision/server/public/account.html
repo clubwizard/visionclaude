@@ -90,8 +90,22 @@
     .user-row button.danger { color: #C25A2B; border-color: #E89A6B; }
     .user-row .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #DDF7E5; color: #2F8A57; font-family: ui-monospace, monospace; }
     .user-row .badge.you { background: #E3ECFE; color: #3B5BBF; }
-    .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
-    .logout { background: transparent; border: 1px solid #D9D1C0; color: #7B7468; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-family: inherit; cursor: pointer; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .top-nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .top-nav a, .logout {
+      background: transparent;
+      border: 1px solid #D9D1C0;
+      color: #7B7468;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    .top-nav a:hover, .logout:hover { border-color: #7B7468; color: #1A1714; }
     .new-invite-btn { padding: 10px 16px; border-radius: 9px; border: 1px solid #6FE3A8; background: #6FE3A8; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
     .mcp-info-grid {
       display: grid;
@@ -139,6 +153,19 @@
     .user-mcp-form textarea:focus { outline: 2px solid #6FE3A8; outline-offset: 1px; }
     .user-mcp-form-actions { margin-top: 14px; display: flex; gap: 8px; }
     .user-mcp-form button { padding: 10px 16px; border-radius: 8px; border: 1px solid #6FE3A8; background: #6FE3A8; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
+    .mcp-quick-examples { margin: 0 0 18px; padding: 14px 16px; background: #F7F4EC; border: 1px solid #E8E0CC; border-radius: 10px; }
+    .mcp-quick-label { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #7B7468; margin-bottom: 10px; }
+    .mcp-quick-examples details { margin-bottom: 4px; }
+    .mcp-quick-examples summary { cursor: pointer; padding: 8px 0; font-size: 13px; color: #1A1714; border-top: 1px solid #E8E0CC; }
+    .mcp-quick-examples details:first-of-type summary { border-top: none; padding-top: 0; }
+    .mcp-quick-examples summary strong { color: #1A1714; }
+    .mcp-quick-body { padding: 6px 0 10px 14px; font-size: 12px; line-height: 1.7; }
+    .mcp-quick-body code { font-family: ui-monospace, monospace; background: #FAF6EC; padding: 1px 6px; border-radius: 4px; color: #4A4540; font-size: 11px; word-break: break-all; }
+    .mcp-quick-key { display: inline-block; min-width: 48px; font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #7B7468; margin-right: 8px; vertical-align: top; }
+    .mcp-quick-how { color: #7B7468; margin-top: 4px; line-height: 1.55; }
+    .mcp-quick-how a { color: #C25A2B; }
+    .mcp-quick-more { margin-top: 12px; padding-top: 12px; border-top: 1px solid #E8E0CC; font-size: 12px; color: #7B7468; }
+    .mcp-quick-more a { color: #C25A2B; }
     .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1A1714; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity 0.2s; }
     .toast.show { opacity: 1; }
     .links { font-size: 13px; color: #7B7468; }
@@ -152,7 +179,11 @@
         <h1>Account</h1>
         <div class="me" id="me">Loading…</div>
       </div>
-      <button class="logout" id="logout">Log out</button>
+      <div class="top-nav">
+        <a href="/app">Voice client</a>
+        <a href="/help">Help &amp; examples</a>
+        <button class="logout" id="logout">Log out</button>
+      </div>
     </div>
 
     <div id="setup-callout" class="setup-callout" hidden>
@@ -252,18 +283,62 @@
     <div class="card" id="user-mcp-card">
       <h2>Your MCP connectors</h2>
       <div class="hint">
-        Hook Aside into <strong>your own</strong> tools (Slack, Notion, GitHub, custom services…) by adding remote MCP servers below. They're scoped to your account &mdash; other users only see the operator's shared tools, never yours.
-        <details style="margin-top:8px">
-          <summary style="cursor:pointer;color:#1A1714">How does this work?</summary>
-          <div style="margin-top:8px;line-height:1.6">
-            An MCP server is a hosted endpoint that exposes tools (send_message, search_repos, etc.) over HTTP. Aside connects to yours with the auth token you provide here, and the tools become available to Claude on your next chat. Aura, Notion, Anthropic Connectors, and self-hosted servers all work the same way &mdash; just paste the URL.
-            <ul style="margin:8px 0 0 18px">
-              <li><strong>URL</strong> &mdash; the server's full HTTPS endpoint (e.g. <code>https://mcp.example.com/sse</code>). Plain HTTP and private IPs are blocked.</li>
-              <li><strong>Auth header</strong> &mdash; usually <code>Bearer your-token</code>. Encrypted at rest with the server's master key.</li>
-              <li>Connections are opened on demand and dropped after 10 minutes idle, so this stays light on the host.</li>
-            </ul>
+        Hook Aside into <strong>your own</strong> tools (Notion, GitHub, Linear, Sentry, your own services…) by adding remote MCP servers below. Scoped to your account &mdash; other users only see the operator's shared tools, never yours.
+      </div>
+
+      <div class="mcp-quick-examples">
+        <div class="mcp-quick-label">Quick examples &mdash; pick a service to see the URL + how to get a token</div>
+        <details>
+          <summary><strong>Notion</strong> &mdash; read pages, search, append to databases</summary>
+          <div class="mcp-quick-body">
+            <div><span class="mcp-quick-key">URL</span><code>https://mcp.notion.com/sse</code></div>
+            <div><span class="mcp-quick-key">Auth</span><code>Bearer secret_…</code></div>
+            <div class="mcp-quick-how">Get a token: <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener">notion.so/profile/integrations</a> &rarr; New integration &rarr; copy the secret. Share each page you want accessible with the integration.</div>
           </div>
         </details>
+        <details>
+          <summary><strong>GitHub</strong> &mdash; PRs, issues, code search, repo browsing</summary>
+          <div class="mcp-quick-body">
+            <div><span class="mcp-quick-key">URL</span><code>https://api.githubcopilot.com/mcp</code></div>
+            <div><span class="mcp-quick-key">Auth</span><code>Bearer ghp_…</code></div>
+            <div class="mcp-quick-how">Get a token: <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> &rarr; Generate (classic) &rarr; scopes: <code>repo</code> + <code>read:org</code>.</div>
+          </div>
+        </details>
+        <details>
+          <summary><strong>Linear</strong> &mdash; issues, projects, comments, status updates</summary>
+          <div class="mcp-quick-body">
+            <div><span class="mcp-quick-key">URL</span><code>https://mcp.linear.app/sse</code></div>
+            <div><span class="mcp-quick-key">Auth</span><code>Bearer lin_api_…</code></div>
+            <div class="mcp-quick-how">Get a token: <a href="https://linear.app/settings/api" target="_blank" rel="noopener">linear.app/settings/api</a> &rarr; Create new API key.</div>
+          </div>
+        </details>
+        <details>
+          <summary><strong>Sentry</strong> &mdash; recent errors, issue triage, release context</summary>
+          <div class="mcp-quick-body">
+            <div><span class="mcp-quick-key">URL</span><code>https://mcp.sentry.dev/sse</code></div>
+            <div><span class="mcp-quick-key">Auth</span><code>Bearer sntrys_…</code></div>
+            <div class="mcp-quick-how">Get a token: sentry.io &rarr; User Settings &rarr; Auth Tokens &rarr; Create New Token.</div>
+          </div>
+        </details>
+        <details>
+          <summary><strong>Stripe</strong> &mdash; customers, charges, subscriptions, refunds</summary>
+          <div class="mcp-quick-body">
+            <div><span class="mcp-quick-key">URL</span><code>https://mcp.stripe.com/</code></div>
+            <div><span class="mcp-quick-key">Auth</span><code>Bearer rk_…</code> (restricted key) or <code>sk_…</code> (full)</div>
+            <div class="mcp-quick-how">Get a token: <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener">dashboard.stripe.com/apikeys</a>. Restricted keys with only the scopes you need are safer.</div>
+          </div>
+        </details>
+        <details>
+          <summary><strong>HubSpot</strong> &mdash; contacts, deals, companies</summary>
+          <div class="mcp-quick-body">
+            <div><span class="mcp-quick-key">URL</span><code>https://app.hubspot.com/mcp/v1/http</code></div>
+            <div><span class="mcp-quick-key">Auth</span><code>Bearer pat-…</code></div>
+            <div class="mcp-quick-how">Get a token: app.hubspot.com &rarr; Settings &rarr; Integrations &rarr; Private Apps &rarr; create with the CRM scopes you need.</div>
+          </div>
+        </details>
+        <div class="mcp-quick-more">
+          More services and a full walkthrough on <a href="/help#mcp">the help page</a> &mdash; Supabase, Neon, Vercel, Atlassian, plus self-hosted patterns.
+        </div>
       </div>
 
       <div id="user-mcp-list"></div>
@@ -272,13 +347,13 @@
         <summary style="cursor:pointer;font-weight:500;font-size:14px;color:#1A1714">+ Add a connector</summary>
         <div class="user-mcp-form">
           <label for="user-mcp-name">Name</label>
-          <input id="user-mcp-name" type="text" placeholder="My Notion workspace" maxlength="64" />
+          <input id="user-mcp-name" type="text" placeholder="My Notion" maxlength="64" />
 
           <label for="user-mcp-url">URL (https://)</label>
-          <input id="user-mcp-url" type="url" placeholder="https://mcp.example.com/sse" autocomplete="off" />
+          <input id="user-mcp-url" type="url" placeholder="https://mcp.notion.com/sse" autocomplete="off" />
 
           <label for="user-mcp-auth">Auth header (optional)</label>
-          <input id="user-mcp-auth" type="password" placeholder="Bearer ..." autocomplete="off" />
+          <input id="user-mcp-auth" type="password" placeholder="Bearer secret_..." autocomplete="off" />
 
           <div id="user-mcp-err" class="test-result err" hidden></div>
           <div class="user-mcp-form-actions">
@@ -325,10 +400,6 @@
       <div id="user-list"></div>
     </div>
 
-    <div class="links">
-      <a href="/app">← Back to voice client</a>
-      <a href="/help">Help &amp; examples →</a>
-    </div>
   </div>
 
   <div class="toast" id="toast"></div>
