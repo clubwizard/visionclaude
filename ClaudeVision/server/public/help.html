@@ -27,6 +27,22 @@
       pointer-events: none;
     }
     .wrap { max-width: 760px; margin: 0 auto; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+    .top-nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .top-nav a {
+      background: transparent;
+      border: 1px solid #D9D1C0;
+      color: #7B7468;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    .top-nav a:hover { border-color: #7B7468; color: #1A1714; }
     h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 40px; letter-spacing: -0.02em; margin-bottom: 4px; }
     .sub { color: #7B7468; font-size: 14px; margin-bottom: 32px; }
     .sub a { color: inherit; }
@@ -99,14 +115,23 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Help</h1>
-    <div class="sub">Everything in one page. <a href="/account">← Back to account</a></div>
+    <div class="top">
+      <div>
+        <h1>Help</h1>
+        <div class="sub">Everything in one page. Examples for each feature.</div>
+      </div>
+      <div class="top-nav">
+        <a href="/account">Account</a>
+        <a href="/app">Voice client</a>
+      </div>
+    </div>
 
     <nav>
       <ol>
         <li><a href="#start">Getting started</a></li>
         <li><a href="#keys">API keys</a></li>
         <li><a href="#voice">Voice client</a></li>
+        <li><a href="#iphone">iPhone app</a></li>
         <li><a href="#skills">Skills</a></li>
         <li><a href="#mcp">MCP connectors</a></li>
         <li><a href="#password">Password reset</a></li>
@@ -185,6 +210,74 @@
       <p>The <em>Voice</em> dropdown lists every voice your configured keys unlock. With only Deepgram set you'll see 10 Aura-2 voices; with OpenAI too, 20. Selection is saved in your browser.</p>
     </div>
 
+    <div class="card" id="iphone">
+      <h2>iPhone app</h2>
+      <p>There's no App Store build yet. You have three realistic paths to running Aside on your iPhone, easiest first.</p>
+
+      <h3>1. Use the web client as a home-screen app (zero install)</h3>
+      <p>This is what most people should start with. It works today, takes 30 seconds, and exercises the same camera + microphone APIs as the native app.</p>
+      <ol>
+        <li>Open <code>https://your-aside-domain/app</code> in Safari on your iPhone.</li>
+        <li>Tap the Share icon (square with up-arrow) → <em>Add to Home Screen</em>.</li>
+        <li>Name it (<em>Aside</em>) and tap Add. You now have an icon that opens straight into the voice client.</li>
+        <li>First time you tap Talk, Safari asks for microphone permission. Grant it. Same for camera.</li>
+      </ol>
+      <div class="example">
+        <div class="label">What works</div>
+        Voice in, voice out, camera frames sent to Claude, voice selection, vision toggle, conversation history.
+      </div>
+      <div class="example">
+        <div class="label">What doesn't</div>
+        Meta Ray-Ban glasses pairing (no Web Bluetooth support in iOS Safari) and reliable background audio. If you don't need those, you may never need the native app.
+      </div>
+
+      <h3>2. Build &amp; sideload via Xcode (free, requires a Mac)</h3>
+      <p>For native app + Ray-Ban support, with a free Apple ID. The signed build expires every 7 days; plug your phone back in and rebuild to refresh.</p>
+      <ol>
+        <li>On your Mac, clone the Aside repository if you haven't already.</li>
+        <li>From the repo, regenerate the Xcode project and open it:
+          <pre>cd ClaudeVision/ios
+xcodegen generate
+open ClaudeVision.xcodeproj</pre>
+        </li>
+        <li>Plug your iPhone into your Mac via USB. Unlock the phone and tap <em>Trust This Computer</em>.</li>
+        <li>In Xcode's toolbar, select your iPhone in the device dropdown.</li>
+        <li>In <em>Signing &amp; Capabilities</em>, sign in with your Apple ID and pick a unique bundle identifier (e.g. <code>com.yourname.aside</code>).</li>
+        <li>Hit ⌘R. The app installs and launches.</li>
+        <li>First launch on the iPhone: <em>Settings → General → VPN &amp; Device Management → Trust your developer certificate</em>.</li>
+      </ol>
+      <div class="callout">
+        With a paid Apple Developer account (US$99/year) the sideload signature lasts a year instead of 7 days, and you don't need to keep plugging in.
+      </div>
+
+      <h3>3. TestFlight (paid, polished, multi-user)</h3>
+      <p>If you have an Apple Developer account, archive the app in Xcode, upload to App Store Connect, invite testers via TestFlight. They install Apple's official TestFlight app and get the build. No expiry. Best for inviting family or coworkers without each plugging into your Mac.</p>
+
+      <h3>Pointing the app at this server</h3>
+      <p>Once the iOS app is installed, tap the gear icon → Settings:</p>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Host</strong></td><td>Your Aside domain (no <code>https://</code>, no port). Example: <code>aside.example.com</code></td></tr>
+          <tr><td><strong>Port</strong></td><td><code>443</code> if you're behind a reverse proxy that terminates HTTPS (typical), <code>18790</code> if you're hitting the container directly</td></tr>
+          <tr><td><strong>Mode</strong></td><td>Gateway (REST) for this kind of hosted deployment. Channel mode is only for a Mac running Claude Desktop locally.</td></tr>
+          <tr><td><strong>Gateway API key</strong></td><td>Optional but recommended for native use — see below</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Authenticating the iPhone (two options)</h3>
+      <p><strong>Option A — session cookie.</strong> Open the in-app web view, log in with your email + password just like in a desktop browser. The session cookie persists for 24 hours; you re-log when it expires.</p>
+      <p><strong>Option B — gateway API key.</strong> The operator generates a single shared secret on the server (in the container's <code>.env</code>):</p>
+      <pre>GATEWAY_API_KEY=$(openssl rand -hex 32)</pre>
+      <p>Restart the container, then paste that 64-char hex string into the iOS app's <em>Gateway API key</em> field. The app sends it as <code>X-Gateway-Key</code> on every request — no login required, no cookie expiry. Useful for a phone that's always you.</p>
+      <div class="callout">
+        <strong>Same Aside, same account?</strong> Either way the iOS app talks to the same Gateway your browser does. Your conversation history, MCP connectors, and skills follow you between devices.
+      </div>
+
+      <h3>Connecting Meta Ray-Ban glasses</h3>
+      <p>Only available in the native iOS app (Bluetooth APIs aren't web-exposed). In Settings, scroll to <em>Meta Ray-Ban Glasses</em> and tap Register. The app uses the official Meta Wearables toolkit to enumerate paired glasses and stream camera frames. The glasses themselves must already be paired via the Meta View app first — Aside consumes the existing Bluetooth connection.</p>
+    </div>
+
     <div class="card" id="skills">
       <h2>Skills</h2>
       <p>Skills are short prompts you install to specialize how Claude responds for you. Think of them as personal preferences Claude follows in specific situations — without you having to repeat yourself every turn.</p>
@@ -261,28 +354,100 @@ the actual visible text over inference.</pre>
       <p>Two requirements for a connector to work here:</p>
       <ul>
         <li>The endpoint must use <strong>https://</strong> (plain http and private IPs are blocked)</li>
-        <li>It must speak the MCP protocol (StreamableHTTP or SSE)</li>
+        <li>It must speak the MCP protocol over HTTP (Streamable HTTP or SSE)</li>
       </ul>
 
-      <h3>Example: a hosted MCP service</h3>
-      <div class="example">
-        <div class="label">Name</div>
-        My Notion workspace
-        <div class="label" style="margin-top:8px">URL</div>
-        <code>https://mcp.notion.example/sse</code>
-        <div class="label" style="margin-top:8px">Auth header</div>
-        <code>Bearer ntn_AbCdEf123...</code>
+      <div class="callout">
+        <strong>About OAuth.</strong> Many hosted MCP services (Notion, GitHub, Linear, Sentry, Atlassian) advertise OAuth as the "official" auth flow. Aside currently sends a static <code>Authorization</code> header — it doesn't drive the OAuth dance for you. All of those services also issue long-lived tokens (integration secrets, personal access tokens, API keys) you can paste here directly. The examples below show the static-token path for each.
       </div>
-      <p style="font-size:13px;color:#7B7468">Most hosted MCP services give you a URL + a token. Paste the token with the <code>Bearer</code> prefix unless they say otherwise. The token is encrypted at rest and never returns to the browser.</p>
 
-      <h3>Example: self-hosted on a public URL</h3>
+      <h3>Real services you can connect right now</h3>
+      <p>These are working URLs at the time of writing. Each row shows the endpoint, how to get a static token from that service's dashboard, and the exact <code>Auth header</code> value to paste.</p>
+
+      <table>
+        <thead><tr><th>Service</th><th>URL</th><th>Auth header</th><th>How to get a token</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Notion</strong></td>
+            <td><code>https://mcp.notion.com/sse</code></td>
+            <td><code>Bearer secret_…</code></td>
+            <td>notion.so/profile/integrations → New internal integration → copy the secret</td>
+          </tr>
+          <tr>
+            <td><strong>GitHub</strong></td>
+            <td><code>https://api.githubcopilot.com/mcp</code></td>
+            <td><code>Bearer ghp_…</code></td>
+            <td>github.com/settings/tokens → Generate (classic, with <code>repo</code> + <code>read:org</code>)</td>
+          </tr>
+          <tr>
+            <td><strong>Linear</strong></td>
+            <td><code>https://mcp.linear.app/sse</code></td>
+            <td><code>Bearer lin_api_…</code></td>
+            <td>linear.app/settings/api → Create new API key</td>
+          </tr>
+          <tr>
+            <td><strong>Sentry</strong></td>
+            <td><code>https://mcp.sentry.dev/sse</code></td>
+            <td><code>Bearer sntrys_…</code></td>
+            <td>sentry.io → User → Auth Tokens → Create New Token</td>
+          </tr>
+          <tr>
+            <td><strong>Stripe</strong></td>
+            <td><code>https://mcp.stripe.com/</code></td>
+            <td><code>Bearer rk_…</code> or <code>sk_…</code></td>
+            <td>dashboard.stripe.com/apikeys → use a restricted key with the scopes you need</td>
+          </tr>
+          <tr>
+            <td><strong>HubSpot</strong></td>
+            <td><code>https://app.hubspot.com/mcp/v1/http</code></td>
+            <td><code>Bearer pat-…</code></td>
+            <td>app.hubspot.com → Settings → Integrations → Private Apps → create</td>
+          </tr>
+          <tr>
+            <td><strong>Supabase</strong></td>
+            <td><code>https://mcp.supabase.com/mcp</code></td>
+            <td><code>Bearer sbp_…</code></td>
+            <td>supabase.com/dashboard → Account → Access Tokens → Generate new token</td>
+          </tr>
+          <tr>
+            <td><strong>Neon</strong></td>
+            <td><code>https://mcp.neon.tech/mcp</code></td>
+            <td><code>Bearer napi_…</code></td>
+            <td>console.neon.tech → Account settings → API keys → Create new</td>
+          </tr>
+          <tr>
+            <td><strong>Vercel</strong></td>
+            <td><code>https://mcp.vercel.com/</code></td>
+            <td><code>Bearer …</code></td>
+            <td>vercel.com/account/tokens → Create</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:13px;color:#7B7468;margin-top:14px">Endpoints occasionally move. If a Test fails with a 404 or "not found", check the service's docs page for the current URL — search "&lt;service&gt; remote MCP server" or "&lt;service&gt; MCP url".</p>
+
+      <h3>Worked example: connect Notion</h3>
+      <ol>
+        <li>Visit <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener">notion.so/profile/integrations</a> and click <em>New integration</em>. Give it a name (e.g. "Aside"). Submit.</li>
+        <li>Copy the <em>Internal Integration Secret</em> — it starts with <code>secret_</code>.</li>
+        <li>Open the Notion pages or databases you want Aside to access, click <em>Share</em>, and add the integration.</li>
+        <li>On Aside's <a href="/account">/account</a> page → <em>Your MCP connectors</em> → <em>+ Add a connector</em>, paste:
+          <div class="example" style="margin-top:8px">
+            <div class="label">Name</div> My Notion
+            <div class="label" style="margin-top:8px">URL</div> <code>https://mcp.notion.com/sse</code>
+            <div class="label" style="margin-top:8px">Auth header</div> <code>Bearer secret_</code> + your integration secret
+          </div>
+        </li>
+        <li>Hit <em>Save connector</em>, then <em>Test</em> on the new row. You should see "Connected. N tools available."</li>
+        <li>Go to <a href="/app">/app</a> and say something like <em>"Find my notes about the Edinburgh trip in Notion"</em> — Claude can now invoke the Notion tools.</li>
+      </ol>
+
+      <h3>Worked example: self-hosted MCP behind your own URL</h3>
+      <p>If you run your own MCP server (or wrap a stdio MCP with <code>supergateway</code> so it speaks HTTP), point Aside at it the same way.</p>
       <div class="example">
-        <div class="label">Name</div>
-        My company GitHub
-        <div class="label" style="margin-top:8px">URL</div>
-        <code>https://mcp.your-company.com/github</code>
-        <div class="label" style="margin-top:8px">Auth header</div>
-        <code>Bearer ghp_yourPersonalAccessToken</code>
+        <div class="label">Name</div> Internal docs search
+        <div class="label" style="margin-top:8px">URL</div> <code>https://mcp.your-company.com/docs</code>
+        <div class="label" style="margin-top:8px">Auth header</div> <code>Bearer your-internal-token</code> <em>(or omit if the server checks IP / mTLS)</em>
       </div>
 
       <h3>Testing a connector</h3>
@@ -291,7 +456,7 @@ the actual visible text over inference.</pre>
       <h3>What happens during a chat</h3>
       <ol>
         <li>Your enabled connectors stay disconnected until you actually use them.</li>
-        <li>On your first <code>/chat</code> after enabling one, the server opens a connection, lists tools, and merges them into the tool set Claude sees.</li>
+        <li>On your first <code>/chat</code> after enabling one, Aside opens a connection, lists tools, and merges them into the tool set Claude sees.</li>
         <li>Connections are cached per user. If you go idle for 10 minutes, the connection is dropped (auto-reopened on next use).</li>
         <li>Each tool call has a 30-second timeout. If your connector hangs, the request fails cleanly instead of blocking the whole chat.</li>
       </ol>
@@ -350,10 +515,6 @@ the actual visible text over inference.</pre>
       <p>Ask the operator of this server. The system administrator has access to server logs and can see what failed.</p>
     </div>
 
-    <div class="links">
-      <a href="/account">← Back to account</a>
-      <a href="/app">Voice client →</a>
-    </div>
   </div>
 </body>
 </html>
