@@ -713,6 +713,9 @@ bun server.ts</pre>
       <h3>Got logged out unexpectedly</h3>
       <p>If you reset your password on another device, your other sessions are invalidated on their next request. Just log in again — it's by design.</p>
 
+      <h3>Users seeing nginx's "502 Bad Gateway" during a deploy</h3>
+      <p>If you (the operator) are deploying via <code>./deploy.sh</code> and users see the raw nginx 502 page during the ~10s rebuild window, you're missing the maintenance-page fallback. The Aside repo ships <code>deploy/maintenance.html</code> (a friendly auto-retrying page) and <code>deploy/README.md</code> (the nginx snippet to wire it up). Drop the HTML somewhere on the host, paste the <code>error_page</code> block into Plesk's <em>Additional nginx directives</em>, and 502/503/504 will serve the friendly page instead. The page polls <code>/health</code> every 5s and auto-reloads users back into the app the moment the new container is healthy.</p>
+
       <h3>"Too many login attempts" / 429 error on login</h3>
       <p>The login endpoint allows 5 attempts per minute per IP — brute-force protection. If you legitimately hit it (forgot which password you used, typo'd a few times), the login dialog now offers an <em>"Email me a reset link"</em> button inline so you don't have to wait the minute out. If you'd rather wait, the countdown ticks down on the same dialog.</p>
       <p style="font-size:13px;color:#7B7468">Reading endpoints (page refreshes, session checks) are NOT counted against this limit — only login, signup, forgot-password, and reset-password are. If you find normal navigation locking you out, ask the operator to check the logs.</p>
