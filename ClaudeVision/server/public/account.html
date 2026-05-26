@@ -408,6 +408,19 @@
     const $ = (id) => document.getElementById(id);
     let me = null;
 
+    // Defensive JSON parser. Returns the parsed body, or null if the
+    // response is not 2xx, isn't application/json, or fails to parse
+    // (most commonly because nginx served an HTML 502/504 page while
+    // the upstream container was restarting). Callers should treat
+    // null as "unknown, leave UI placeholder + try again later" rather
+    // than letting the SyntaxError crash the page script.
+    async function safeJson(res) {
+      if (!res || !res.ok) return null;
+      const ct = (res.headers && res.headers.get && res.headers.get('content-type')) || '';
+      if (!ct.includes('application/json')) return null;
+      try { return await res.json(); } catch { return null; }
+    }
+
     const toast = (msg) => {
       const t = $('toast');
       t.textContent = msg;
@@ -417,7 +430,13 @@
 
     async function loadMe() {
       const res = await fetch('/auth/check');
-      const data = await res.json();
+      const data = await safeJson(res);
+      // If the response couldn't be parsed (e.g. nginx 502 during a
+      // deploy), leave the page placeholders in place rather than
+      // bouncing the user to the login screen. nginx's maintenance
+      // page would normally cover this; if it didn't, the user can
+      // refresh once the server is back.
+      if (!data) return;
       if (!data.authenticated) { window.location.href = '/'; return; }
       me = data.user;
       const meEl = $('me');
@@ -529,8 +548,9 @@
 
     async function loadInvites() {
       const res = await fetch('/admin/invites');
-      if (!res.ok) return;
-      const { invites } = await res.json();
+      const data = await safeJson(res);
+      if (!data) return;
+      const { invites = [] } = data;
       const list = $('invite-list');
       list.innerHTML = '';
       for (const inv of invites) {
@@ -550,8 +570,9 @@
     async function loadUserSkills() {
       try {
         const res = await fetch('/me/skills');
-        if (!res.ok) return;
-        const { skills } = await res.json();
+        const data = await safeJson(res);
+        if (!data) return;
+        const { skills = [] } = data;
         const list = $('user-skills-list');
         list.textContent = '';
         if (!skills?.length) {
@@ -679,8 +700,9 @@
     async function loadUserMcpServers() {
       try {
         const res = await fetch('/me/mcp-servers');
-        if (!res.ok) return;
-        const { servers } = await res.json();
+        const data = await safeJson(res);
+        if (!data) return;
+        const { servers = [] } = data;
         const list = $('user-mcp-list');
         list.textContent = '';
         if (!servers?.length) {
@@ -841,8 +863,8 @@
     async function loadMcpInfo() {
       try {
         const res = await fetch('/me/mcp-info');
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await safeJson(res);
+        if (!data) return;
         // Counts — use textContent on the spans, not innerHTML
         $('mcp-server-count').textContent = data.servers?.length ?? 0;
         $('mcp-tool-count').textContent = data.totalTools ?? 0;
@@ -878,8 +900,9 @@
 
     async function loadUsers() {
       const res = await fetch('/admin/users');
-      if (!res.ok) return;
-      const { users } = await res.json();
+      const data = await safeJson(res);
+      if (!data) return;
+      const { users = [] } = data;
       const list = $('user-list');
       list.innerHTML = '';
       for (const u of users) {
@@ -992,7 +1015,11 @@
     $('new-invite').onclick = async (e) => {
       const btn = e.currentTarget;
       const res = await fetch('/admin/invites', { method: 'POST' });
-      const data = await res.json();
+      const data = await safeJson(res);
+      if (!data || !data.signupUrl) {
+        toast('Could not create invite — try again');
+        return;
+      }
       const url = `${location.origin}${data.signupUrl}`;
       try {
         await navigator.clipboard.writeText(url);

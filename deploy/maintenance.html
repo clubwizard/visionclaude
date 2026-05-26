@@ -1,0 +1,125 @@
+<!doctype html>
+<!--
+  Aside upstream-down fallback page.
+  Served by nginx (NOT by the Node app — the Node app is what's down)
+  when the upstream container can't be reached: 502 / 503 / 504.
+  Auto-retries every 5s using a tiny inline poll, so the moment the new
+  container is healthy the user lands back in the app without refreshing.
+  All assets inlined — no external fonts / CDNs / scripts, because if
+  network is partial the user should still see something.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Aside — be right back</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      padding-top: calc(24px + env(safe-area-inset-top));
+      background: #F4EFE5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1A1714;
+    }
+    .card {
+      max-width: 440px;
+      width: 100%;
+      padding: 40px 32px;
+      background: #fff;
+      border: 1px solid #D9D1C0;
+      border-radius: 18px;
+      text-align: center;
+    }
+    h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 400;
+      font-size: 36px;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+    .sub {
+      color: #7B7468;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #FF9500;
+      border-radius: 50%;
+      margin-right: 8px;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; transform: scale(0.85); }
+      50%      { opacity: 1;   transform: scale(1); }
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7B5F2A;
+      padding: 6px 12px;
+      background: #FFF1DA;
+      border: 1px solid #F0D8A8;
+      border-radius: 999px;
+    }
+    .countdown {
+      margin-top: 18px;
+      font-size: 12px;
+      color: #7B7468;
+    }
+    .countdown strong { color: #1A1714; font-variant-numeric: tabular-nums; }
+    @media (prefers-reduced-motion: reduce) {
+      .dot { animation: none; opacity: 0.8; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card" role="status" aria-live="polite">
+    <h1>Be right back.</h1>
+    <p class="sub">Aside is restarting after an update. This usually takes 10–30 seconds; you'll be sent straight to the app once it's ready.</p>
+    <span class="status"><span class="dot" aria-hidden="true"></span>Server restarting</span>
+    <div class="countdown">Retrying in <strong id="t">5</strong>s…</div>
+  </div>
+
+  <script>
+    // Auto-retry: every 5s, fetch a tiny path. As soon as we get a 200
+    // (the new container is healthy), reload to land back in the app.
+    // Probing /health specifically because it's unauthenticated and
+    // cheap. Cache-bust so a stale 502 isn't served by any intermediate
+    // cache.
+    var counter = document.getElementById('t');
+    var remaining = 5;
+    setInterval(function () {
+      remaining--;
+      if (remaining <= 0) {
+        remaining = 5;
+        fetch('/health?_=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) {
+            if (r && r.ok) {
+              // Land back at the root rather than the requested URL —
+              // if the user was on /account or /app they pick up where
+              // they were because their session cookie is still valid.
+              window.location.reload();
+            }
+          })
+          .catch(function () {
+            // Network error — server still down. Keep waiting.
+          });
+      }
+      counter.textContent = remaining;
+    }, 1000);
+  </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express, { type Request, type Response } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import session from "express-session";
 import path from "path";
@@ -245,6 +245,76 @@ async function main() {
     const newPrompt = DEFAULT_SYSTEM_PROMPT + skillLoader.buildSystemPromptSection();
     claudeClient.updateConfig({ systemPrompt: newPrompt });
     res.json({ message: "Skills reloaded", skills: skillLoader.getSkillList(), count: skillLoader.count });
+  });
+
+  // ── 404 + global error handlers (JSON for API paths, HTML for pages) ──
+  //
+  // Without these, Express's defaults kick in: an unmatched URL or an
+  // unhandled exception in a route handler returns Express's built-in
+  // HTML error page. That's how the client ends up calling res.json()
+  // on a body that starts with "<!DOCTYPE" and gets "Unexpected token <".
+  //
+  // We split by request "shape": browser page requests (Accept: text/html,
+  // no Accept: application/json) get HTML — sending an HTML 404 to a user
+  // who typed a bad URL is friendlier than JSON. Anything else (XHR,
+  // fetch with default Accept, our own JS clients) gets JSON.
+  function wantsJson(req: Request): boolean {
+    const accept = (req.headers.accept || "").toLowerCase();
+    // Heuristics: explicit JSON ask, X-Requested-With (jQuery legacy +
+    // some libraries), or path under a known API prefix.
+    if (accept.includes("application/json")) return true;
+    if (req.headers["x-requested-with"] === "XMLHttpRequest") return true;
+    const p = req.path;
+    return (
+      p.startsWith("/auth/") ||
+      p.startsWith("/me/") ||
+      p.startsWith("/admin/") ||
+      p === "/chat" ||
+      p.startsWith("/voice/") ||
+      p.startsWith("/config/") ||
+      p.startsWith("/tools/") ||
+      p === "/skills" ||
+      p === "/skills/reload" ||
+      p === "/health"
+    );
+  }
+
+  // 404 — must come AFTER all routes
+  app.use((req: Request, res: Response) => {
+    if (wantsJson(req)) {
+      res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
+      return;
+    }
+    res.status(404).type("text/plain").send("Not found.");
+  });
+
+  // Global error handler — must have the 4-arg signature (err, req, res,
+  // next) for Express to recognize it as an error handler. Catches:
+  //   - thrown errors from route handlers
+  //   - JSON body parse failures from express.json() (SyntaxError)
+  //   - anything called next(err) anywhere
+  app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+    // Body parse failures bubble up as SyntaxError with status=400.
+    const status =
+      (typeof err === "object" && err !== null && "status" in err && typeof (err as { status?: unknown }).status === "number")
+        ? (err as { status: number }).status
+        : 500;
+    const message = err instanceof Error ? err.message : "Internal server error";
+    // Log full error server-side; surface only a short message to the client.
+    if (status >= 500) {
+      console.error(c.error(`[${req.method} ${req.path}] ${status}:`), err);
+    }
+    if (res.headersSent) {
+      // Express recommends delegating to default handler in this case;
+      // safest is to just end the response.
+      res.end();
+      return;
+    }
+    if (wantsJson(req)) {
+      res.status(status).json({ error: message });
+      return;
+    }
+    res.status(status).type("text/plain").send(message);
   });
 
   // ── Start ──
